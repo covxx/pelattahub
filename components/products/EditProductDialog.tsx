@@ -49,7 +49,7 @@ const productSchema = z.object({
       },
       { message: "GTIN must be exactly 14 digits" }
     ),
-  target_temp_f: z.coerce.number().int().optional().nullable(),
+  target_temp_f: z.number().int().optional().nullable(),
   image_url: z.string().url().optional().nullable().or(z.literal("")),
 })
 

@@ -26,7 +26,7 @@ import { adjustLotQuantity } from "@/app/actions/inventory"
 import type { InventoryLot } from "@/types/inventory"
 
 const adjustSchema = z.object({
-  quantity: z.coerce.number().int().min(0, "Quantity cannot be negative"),
+  quantity: z.number().int().min(0, "Quantity cannot be negative"),
   reason: z.string().optional(),
 })
 

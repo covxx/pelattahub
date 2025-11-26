@@ -31,7 +31,7 @@ import type { Product } from "@/types/product"
 
 const receivingSchema = z.object({
   productId: z.string().min(1, "Product is required"),
-  quantityReceived: z.coerce.number().int().min(1, "Quantity must be at least 1"),
+  quantityReceived: z.number().int().min(1, "Quantity must be at least 1"),
   receivedDate: z.string().min(1, "Received date is required"),
   originCountry: z.string().min(1, "Country of origin is required"),
   growerId: z.string().optional(),
@@ -248,7 +248,14 @@ export function ReceivingForm() {
                   <FormItem>
                     <FormLabel>Quantity *</FormLabel>
                     <FormControl>
-                      <Input type="number" min="1" {...field} />
+                      <Input
+                        type="number"
+                        min="1"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 1)
+                        }
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
