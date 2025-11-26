@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Roles Enum
+enum Role {
+  ADMIN
+  RECEIVER
+  PACKER
+}
+
+// Lot Status Enum
+enum LotStatus {
+  RECEIVED
+  QC_PENDING
+  AVAILABLE
+  EXPIRED
+}
+
+// User Model
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?   // Hashed password (optional for OAuth users)
+  role          Role      @default(RECEIVER)
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  
+  @@map("users")
+}
+
+// NextAuth Account Model
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// NextAuth Session Model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// NextAuth Verification Token Model
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Product (SKU) Model
+model Product {
+  id            String    @id @default(cuid())
+  sku           String    @unique // e.g., "APP-GAL-40"
+  name          String    // e.g., "Gala Apples"
+  variety       String?   // e.g., "Royal Gala"
+  description   String?
+  gtin          String?   @unique // Global Trade Item Number (barcode/UPC) - must be unique
+  target_temp_f Int?      // Storage temp in Fahrenheit (useful for produce)
+  image_url     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  lots          InventoryLot[]
+  
+  @@map("products")
+}
+
+// Inventory Lot Model - Core of the lot-based tracking system
+model InventoryLot {
+  id                String    @id @default(uuid()) @db.Uuid
+  lot_number        String    @unique
+  product_id        String
+  product           Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  
+  quantity_received Int
+  quantity_current  Int
+  received_date     DateTime  @default(now())
+  expiry_date       DateTime
+  
+  origin_country    String    // Crucial for produce
+  grower_id         String?   // Optional
+  status            LotStatus @default(RECEIVED)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([product_id])
+  @@index([received_date])
+  @@index([expiry_date])
+  @@index([status])
+  @@map("inventory_lots")
+}

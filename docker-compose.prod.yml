@@ -1,0 +1,14 @@
+version: '3.8'
+
+# Production docker-compose override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  app:
+    environment:
+      NODE_ENV: production
+      # Override with production values
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+    # Add production-specific configurations here
+    # e.g., resource limits, logging, etc.
+
