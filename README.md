@@ -137,16 +137,26 @@ wms/
     └── next-auth.d.ts   # NextAuth type extensions
 ```
 
+## Project Roadmap
+
+See [ROADMAP.md](./ROADMAP.md) for detailed information about upcoming features:
+
+- 🏷️ **Print UX Polish** - Streamlined printing workflow
+- 🚚 **Outbound Order Management** - Complete order-to-shipment workflow with FIFO allocation
+- 📄 **Document Generation** - PDF receipts, BOL, and packing slips
+- 💰 **QuickBooks Online Integration** - Two-way sync for customers, products, and invoices
+
 ## Next Steps
 
-1. Create seed data for initial users and products
-2. Build the authentication pages (login, signup)
-3. Implement role-based route protection
-4. Create the Inbound screen for Receivers
-5. Create the Labeling screen for Packers
-6. Build the Admin dashboard
-7. Implement lot creation and management
-8. Add FIFO sorting and expiry tracking
+1. ✅ Create seed data for initial users and products
+2. ✅ Build the authentication pages (login, signup)
+3. ✅ Implement role-based route protection
+4. ✅ Create the Inbound screen for Receivers
+5. ✅ Create the Labeling screen for Packers
+6. ✅ Build the Admin dashboard
+7. ✅ Implement lot creation and management
+8. ✅ Add FIFO sorting and expiry tracking
+9. 🔄 See ROADMAP.md for upcoming features
 
 ## Development
 
