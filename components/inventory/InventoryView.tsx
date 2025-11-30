@@ -12,6 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { LotRow } from "./LotRow"
+import { useToast } from "@/hooks/useToast"
+import { ToastContainer } from "@/components/ui/toast"
 import type { InventoryLot } from "@/types/inventory"
 
 interface InventoryViewProps {
@@ -23,6 +25,7 @@ export function InventoryView({ initialLots }: InventoryViewProps) {
     new Set()
   )
   const [lots] = useState<InventoryLot[]>(initialLots)
+  const { toasts, removeToast } = useToast()
 
   // Group lots by product
   const groupedLots = useMemo(() => {
@@ -170,6 +173,9 @@ export function InventoryView({ initialLots }: InventoryViewProps) {
           )}
         </TableBody>
       </Table>
+
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

@@ -1,25 +1,29 @@
-import { auth } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import { ReceivingForm } from "@/components/receiving/ReceivingForm"
+import { BatchReceivingForm } from "@/components/receiving/BatchReceivingForm"
+import { getActiveProducts } from "@/app/actions/products"
+import { getActiveVendors } from "@/app/actions/vendors"
+import { getTopVendors } from "@/app/actions/receiving"
+
+export const dynamic = "force-dynamic"
 
 export default async function ReceivingPage() {
-  const session = await auth()
-
-  // Security check: Only receivers and admins can access
-  if (!session?.user || (session.user.role !== "RECEIVER" && session.user.role !== "ADMIN")) {
-    redirect("/")
-  }
+  const [products, vendors, topVendors] = await Promise.all([
+    getActiveProducts(),
+    getActiveVendors(),
+    getTopVendors(),
+  ])
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Receive Inventory</h1>
-        <p className="text-muted-foreground mt-1">
-          Record new inventory lots and print GS1-128 labels
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Batch Receiving
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
+          Receive multiple items from a vendor and print labels
         </p>
       </div>
 
-      <ReceivingForm />
+      <BatchReceivingForm products={products} vendors={vendors} topVendors={topVendors} />
     </div>
   )
 }

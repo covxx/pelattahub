@@ -23,6 +23,20 @@ enum LotStatus {
   QC_PENDING
   AVAILABLE
   EXPIRED
+  DEPLETED
+}
+
+// Unit Type Enum
+enum UnitType {
+  CASE
+  LBS
+  EACH
+}
+
+// Receiving Status Enum
+enum ReceivingStatus {
+  OPEN
+  FINALIZED
 }
 
 // User Model
@@ -38,8 +52,10 @@ model User {
   updatedAt     DateTime  @updatedAt
   
   // Relations
-  accounts      Account[]
-  sessions      Session[]
+  accounts         Account[]
+  sessions         Session[]
+  receivingEvents  ReceivingEvent[]
+  auditLogs        AuditLog[]
   
   @@map("users")
 }
@@ -86,45 +102,134 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// Product (SKU) Model
-model Product {
-  id            String    @id @default(cuid())
-  sku           String    @unique // e.g., "APP-GAL-40"
-  name          String    // e.g., "Gala Apples"
-  variety       String?   // e.g., "Royal Gala"
-  description   String?
-  gtin          String?   @unique // Global Trade Item Number (barcode/UPC) - must be unique
-  target_temp_f Int?      // Storage temp in Fahrenheit (useful for produce)
-  image_url     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+// Vendor Model
+model Vendor {
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String
+  code            String           @unique // e.g., "SYSCO", "LOCAL"
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   
   // Relations
-  lots          InventoryLot[]
+  receivingEvents ReceivingEvent[]
+  
+  @@map("vendors")
+}
+
+// Customer Model
+model Customer {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  code           String   @unique // e.g., "CUST001"
+  address        String?
+  contact_email  String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  @@map("customers")
+}
+
+// Audit Log Model
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  action      String   // e.g., "RECEIVE", "EDIT", "DELETE", "PRINT"
+  entity_type String   // e.g., "LOT", "RECEIVING_EVENT", "VENDOR", "PRODUCT"
+  entity_id   String   // The specific ID of the object modified
+  details     Json?    // Store { old_value: ..., new_value: ..., metadata: ... }
+  createdAt   DateTime @default(now())
+  
+  @@index([user_id])
+  @@index([action])
+  @@index([entity_type])
+  @@index([entity_id])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// System Setting Model
+model SystemSetting {
+  key         String   @id // e.g., "company_name", "company_address"
+  value       String   @db.Text // The actual setting value
+  description String?  // Optional description for admins
+  updatedAt   DateTime @updatedAt
+  
+  @@map("system_settings")
+}
+
+// Product (SKU) Model
+model Product {
+  id                     String         @id @default(cuid())
+  sku                    String         @unique // e.g., "APP-GAL-40"
+  name                   String         // e.g., "Gala Apples"
+  variety                String?        // e.g., "Royal Gala"
+  description            String?
+  gtin                   String         @unique // Global Trade Item Number (barcode/UPC) - required
+  default_origin_country String         // Default country for auto-fill
+  unit_type              UnitType       @default(CASE) // CASE, LBS, or EACH
+  standard_case_weight   Float?         // Weight in LBS of 1 case (e.g., 40.0 for apple case)
+  target_temp_f          Int?           // Storage temp in Fahrenheit (useful for produce)
+  image_url              String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  
+  // Relations
+  lots                   InventoryLot[]
   
   @@map("products")
 }
 
+// Receiving Event Model - Batch Receiving Header
+model ReceivingEvent {
+  id              String           @id @default(uuid()) @db.Uuid
+  vendor_id       String           @db.Uuid
+  vendor          Vendor           @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  received_date   DateTime
+  status          ReceivingStatus  @default(OPEN)
+  finalized_at    DateTime?
+  notes           String?
+  created_by      String
+  user            User             @relation(fields: [created_by], references: [id], onDelete: Restrict)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  // Relations
+  lots            InventoryLot[]
+  
+  @@index([vendor_id])
+  @@index([created_by])
+  @@index([received_date])
+  @@index([status])
+  @@map("receiving_events")
+}
+
 // Inventory Lot Model - Core of the lot-based tracking system
 model InventoryLot {
-  id                String    @id @default(uuid()) @db.Uuid
-  lot_number        String    @unique
-  product_id        String
-  product           Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  id                  String          @id @default(uuid()) @db.Uuid
+  lot_number          String          @unique
+  product_id          String
+  product             Product         @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  receiving_event_id  String?         @db.Uuid
+  receivingEvent      ReceivingEvent? @relation(fields: [receiving_event_id], references: [id], onDelete: SetNull)
   
-  quantity_received Int
-  quantity_current  Int
-  received_date     DateTime  @default(now())
-  expiry_date       DateTime
+  original_quantity   Int             // Initial quantity received
+  quantity_received   Int             // Same as original for backwards compatibility
+  quantity_current    Int             // Current quantity (after adjustments)
+  received_date       DateTime        @default(now())
+  expiry_date         DateTime
   
-  origin_country    String    // Crucial for produce
-  grower_id         String?   // Optional
-  status            LotStatus @default(RECEIVED)
+  origin_country      String          // Crucial for produce
+  grower_id           String?         // Optional
+  status              LotStatus       @default(RECEIVED)
   
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
   
   @@index([product_id])
+  @@index([receiving_event_id])
   @@index([received_date])
   @@index([expiry_date])
   @@index([status])

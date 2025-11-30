@@ -1,29 +1,18 @@
-import { auth } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import { InventoryView } from "@/components/inventory/InventoryView"
-import { getInventoryLots } from "@/app/actions/inventory"
+import { InventoryHub } from "@/components/inventory/InventoryHub"
+import { getInventoryCatalog } from "@/app/actions/inventory"
 
-export default async function InventoryPage() {
-  const session = await auth()
+export default async function InventoryPage({
+  searchParams,
+}: {
+  searchParams: { search?: string; showOutOfStock?: string }
+}) {
+  const search = searchParams.search || ""
+  const showOutOfStock = searchParams.showOutOfStock === "true"
 
-  // Security check: Only authenticated users can access
-  if (!session?.user) {
-    redirect("/")
-  }
+  const catalog = await getInventoryCatalog({
+    activeOnly: !showOutOfStock,
+    search,
+  })
 
-  const lots = await getInventoryLots()
-
-  return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Inventory Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          View and manage inventory lots grouped by product
-        </p>
-      </div>
-
-      <InventoryView initialLots={lots} />
-    </div>
-  )
+  return <InventoryHub initialCatalog={catalog} />
 }
-

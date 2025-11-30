@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   TableRow,
   TableCell,
@@ -15,8 +15,9 @@ import { Button } from "@/components/ui/button"
 import { MoreVertical, Printer, Edit, History } from "lucide-react"
 import { AdjustQuantityDialog } from "./AdjustQuantityDialog"
 import { ViewHistoryDialog } from "./ViewHistoryDialog"
-import { useZebraPrinter } from "@/contexts/ZebraPrinterContext"
-import { generateGS1Label } from "@/lib/zpl-generator"
+import { generateCaseLabel, generatePTILabel } from "@/lib/zpl-generator"
+import { printZplViaBrowser } from "@/lib/print-service"
+import { getCompanySettings } from "@/app/actions/settings"
 import { useToast } from "@/hooks/useToast"
 import type { InventoryLot } from "@/types/inventory"
 
@@ -29,8 +30,21 @@ interface LotRowProps {
 export function LotRow({ lot, daysLeft, expiryStatus }: LotRowProps) {
   const [isAdjustOpen, setIsAdjustOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const { print, isConnected } = useZebraPrinter()
-  const { showToast } = useToast()
+  const [companySettings, setCompanySettings] = useState<any>(null)
+  const { toast } = useToast()
+
+  // Fetch company settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await getCompanySettings()
+        setCompanySettings(settings)
+      } catch (err) {
+        console.error("Failed to load company settings:", err)
+      }
+    }
+    fetchSettings()
+  }, [])
 
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -64,34 +78,49 @@ export function LotRow({ lot, daysLeft, expiryStatus }: LotRowProps) {
     }
   }
 
-  const handleReprint = async () => {
-    if (!isConnected) {
-      showToast("Please connect to a Zebra printer first", "error")
-      return
-    }
-
+  const handleReprint = () => {
     if (!lot.product.gtin) {
-      showToast("Cannot print: Product missing GTIN", "error")
+      toast("Cannot print: Product missing GTIN", "error")
       return
     }
 
     try {
-      const zpl = generateGS1Label(
-        {
-          lot_number: lot.lot_number,
-          received_date: lot.received_date,
-        },
-        {
+      // Use PTI label if company settings are loaded
+      let zpl
+      if (companySettings) {
+        zpl = generatePTILabel(
+          lot,
+          {
+            name: lot.product.name,
+            gtin: lot.product.gtin,
+            unit_type: lot.product.unit_type,
+          },
+          companySettings,
+          {
+            caseWeight: lot.product.standard_case_weight || undefined,
+            unitType: lot.product.unit_type,
+            origin: lot.origin_country || undefined,
+          }
+        )
+      } else {
+        // Fallback to standard case label
+        zpl = generateCaseLabel(lot, {
           name: lot.product.name,
           gtin: lot.product.gtin,
           variety: lot.product.variety,
-        }
-      )
-      await print(zpl)
-      showToast(`Label sent to printer for Lot #${lot.lot_number}`, "success")
+        })
+      }
+      
+      // Print via browser's native print dialog
+      printZplViaBrowser(zpl, {
+        windowTitle: `Label - Lot ${lot.lot_number}`,
+      })
+
+      // Show instruction toast
+      toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
     } catch (err) {
-      showToast(
-        `Print failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      toast(
+        `Print failed: ${err instanceof Error ? err.message : "Failed to open print window. Please allow popups."}`,
         "error"
       )
     }
@@ -143,12 +172,9 @@ export function LotRow({ lot, daysLeft, expiryStatus }: LotRowProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={handleReprint}
-                disabled={!isConnected}
-              >
+              <DropdownMenuItem onSelect={handleReprint}>
                 <Printer className="h-4 w-4 mr-2" />
-                Reprint Label {!isConnected && "(Printer not connected)"}
+                Reprint Label
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsAdjustOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" />
