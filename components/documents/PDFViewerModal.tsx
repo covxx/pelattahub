@@ -70,34 +70,61 @@ export function PDFViewerModal({
     }
   }
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (providedPdfUrl) {
-      // Simple approach: Open PDF URL directly in new window with print parameter
-      // The API will serve it with 'inline' disposition so it opens in browser viewer
-      const baseUrl = providedPdfUrl.split("?")[0]
-      const printUrl = `${baseUrl}?print=true`
-      
-      // Open in new window - browser will use native PDF viewer
-      const printWindow = window.open(printUrl, "_blank")
-      
-      if (!printWindow) {
-        alert("Please allow popups for this site to enable printing")
-        return
-      }
-      
-      // Wait for PDF to load, then trigger print dialog
-      // Use a simple timeout approach since we can't reliably detect PDF load
-      setTimeout(() => {
-        try {
-          if (printWindow && !printWindow.closed) {
-            printWindow.focus()
-            printWindow.print()
-          }
-        } catch (e) {
-          // Cross-origin or other error - user can manually print with Ctrl+P
-          console.log("Auto-print may be blocked. Use Ctrl+P or browser print button.")
+      try {
+        // Fetch PDF as blob to ensure it opens in browser viewer (not downloads)
+        const baseUrl = providedPdfUrl.split("?")[0]
+        const printUrl = `${baseUrl}?print=true`
+        
+        const response = await fetch(printUrl, {
+          credentials: 'include', // Include cookies for auth
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status}`)
         }
-      }, 1500) // Give PDF time to load in browser viewer
+        
+        const blob = await response.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        
+        // Open blob URL in new window - this forces browser to use native PDF viewer
+        const printWindow = window.open(blobUrl, "_blank")
+        
+        if (!printWindow) {
+          alert("Please allow popups for this site to enable printing")
+          URL.revokeObjectURL(blobUrl)
+          return
+        }
+        
+        // Wait for PDF to load in browser's native viewer, then trigger print dialog
+        // Multiple attempts to ensure print dialog appears
+        const triggerPrint = () => {
+          try {
+            if (printWindow && !printWindow.closed) {
+              printWindow.focus()
+              printWindow.print()
+            }
+          } catch (e) {
+            console.log("Auto-print blocked. User can press Ctrl+P or use browser print button.")
+          }
+        }
+        
+        // Try after 1 second
+        setTimeout(triggerPrint, 1000)
+        // Try again after 2 seconds (in case first attempt was too early)
+        setTimeout(triggerPrint, 2000)
+        // Final attempt after 3 seconds
+        setTimeout(() => {
+          triggerPrint()
+          // Clean up blob URL after printing
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+        }, 3000)
+        
+      } catch (error) {
+        console.error("Error printing PDF:", error)
+        alert("Failed to load PDF for printing. Please try downloading and printing manually.")
+      }
       
     } else if (memoizedDocument) {
       // For client-side generated PDFs, generate blob and open in native viewer
