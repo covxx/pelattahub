@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Download, X } from "lucide-react"
+import { Download, X, Printer } from "lucide-react"
 
 interface PDFViewerModalProps {
   open: boolean
@@ -66,6 +66,67 @@ export function PDFViewerModal({
     }
   }
 
+  const handlePrint = () => {
+    if (providedPdfUrl) {
+      // Open PDF in new window and print
+      const printWindow = window.open(providedPdfUrl, "_blank")
+      if (printWindow) {
+        // Wait for PDF to load, then trigger print dialog
+        const checkLoad = setInterval(() => {
+          try {
+            if (printWindow.document.readyState === "complete") {
+              clearInterval(checkLoad)
+              setTimeout(() => {
+                printWindow.print()
+              }, 500) // Small delay to ensure PDF is fully rendered
+            }
+          } catch (e) {
+            // Cross-origin or other error - try printing anyway
+            clearInterval(checkLoad)
+            setTimeout(() => {
+              printWindow.print()
+            }, 1000)
+          }
+        }, 100)
+        
+        // Fallback timeout
+        setTimeout(() => {
+          clearInterval(checkLoad)
+          try {
+            printWindow.print()
+          } catch (e) {
+            console.error("Print error:", e)
+          }
+        }, 3000)
+      }
+    } else if (memoizedDocument) {
+      // For client-side generated PDFs, generate blob and print
+      setIsGenerating(true)
+      import("@react-pdf/renderer").then(({ pdf }) => {
+        pdf(memoizedDocument as any)
+          .toBlob()
+          .then((blob) => {
+            const url = URL.createObjectURL(blob)
+            const printWindow = window.open(url, "_blank")
+            if (printWindow) {
+              printWindow.onload = () => {
+                setTimeout(() => {
+                  printWindow.print()
+                  URL.revokeObjectURL(url)
+                }, 500)
+              }
+            }
+            setIsGenerating(false)
+          })
+          .catch((error) => {
+            console.error("Error generating PDF for print:", error)
+            setIsGenerating(false)
+            alert("Failed to generate PDF for printing")
+          })
+      })
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -73,6 +134,15 @@ export function PDFViewerModal({
           <div className="flex items-center justify-between">
             <DialogTitle>{title || "PDF Document"}</DialogTitle>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                disabled={isGenerating}
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -113,10 +183,11 @@ function PDFViewer({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // If PDF URL is provided, use it directly
+    // If PDF URL is provided, use it directly for display
     if (providedPdfUrl) {
       setPdfUrl(providedPdfUrl)
       setIsLoading(false)
+      setError(null)
       return
     }
 
