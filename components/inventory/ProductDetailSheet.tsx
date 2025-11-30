@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { format, formatDistanceToNow } from "date-fns"
+import { parseDate } from "@/lib/utils"
 import {
   Sheet,
   SheetContent,
@@ -185,7 +186,8 @@ export function ProductDetailSheet({
               <div className="space-y-3">
                 {product.lots.map((lot) => {
                   const expiryInfo = getExpiryStatus(lot.expiry_date)
-                  const receivedDate = new Date(lot.received_date)
+                  // Use utility function to parse date consistently
+                  const receivedDate = parseDate(lot.received_date)
 
                   return (
                     <div
