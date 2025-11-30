@@ -165,35 +165,11 @@ export function ReceivingEventDetail({
       </div>
 
       {/* PDF Modal */}
-      {companySettings && event && showPDFModal && (
+      {event && showPDFModal && (
         <PDFViewerModal
           open={showPDFModal}
           onOpenChange={setShowPDFModal}
-          document={React.createElement(ReceivingReceiptPDF, {
-            receivingEvent: {
-              ...event,
-              received_date: event.received_date instanceof Date 
-                ? event.received_date.toISOString() 
-                : typeof event.received_date === 'string'
-                ? event.received_date
-                : new Date(event.received_date).toISOString(),
-              lots: (event.lots || []).map((lot: any) => ({
-                ...lot,
-                product: {
-                  ...lot.product,
-                  standard_case_weight: lot.product?.standard_case_weight ?? null,
-                  unit_type: lot.product?.unit_type || "CASE",
-                  name: lot.product?.name || "Unknown",
-                  sku: lot.product?.sku || "N/A",
-                  variety: lot.product?.variety || null,
-                },
-              })),
-            },
-            companySettings: {
-              name: companySettings.name || "",
-              address: companySettings.address || "",
-            },
-          })}
+          pdfUrl={`/api/receipt/pdf?eventId=${event.id}`}
           filename={`Receiving_Receipt_${event.id.slice(0, 8).toUpperCase()}.pdf`}
           title={`Receiving Receipt #${event.id.slice(0, 8).toUpperCase()}`}
         />

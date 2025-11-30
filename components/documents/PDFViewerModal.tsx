@@ -4,12 +4,12 @@ import React, { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Download, X } from "lucide-react"
-import { pdf } from "@react-pdf/renderer"
 
 interface PDFViewerModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  document: React.ReactElement
+  document?: React.ReactElement
+  pdfUrl?: string // Alternative: direct PDF URL from API
   filename: string
   title?: string
 }
@@ -18,6 +18,7 @@ export function PDFViewerModal({
   open,
   onOpenChange,
   document: pdfDocument,
+  pdfUrl: providedPdfUrl,
   filename,
   title,
 }: PDFViewerModalProps) {
@@ -29,18 +30,33 @@ export function PDFViewerModal({
   const handleDownload = async () => {
     setIsGenerating(true)
     try {
-      // Use memoized document
-      const blob = await pdf(memoizedDocument as any).toBlob()
-      const url = URL.createObjectURL(blob)
-      const link = window.document.createElement("a")
-      link.href = url
-      link.download = filename
-      if (typeof window !== "undefined" && window.document.body) {
-        window.document.body.appendChild(link)
-        link.click()
-        window.document.body.removeChild(link)
+      if (providedPdfUrl) {
+        // If PDF URL is provided, download directly
+        const link = window.document.createElement("a")
+        link.href = providedPdfUrl
+        link.download = filename
+        if (typeof window !== "undefined" && window.document.body) {
+          window.document.body.appendChild(link)
+          link.click()
+          window.document.body.removeChild(link)
+        }
+      } else if (memoizedDocument) {
+        // Fallback to client-side generation (may have React 19 issues)
+        const { pdf } = await import("@react-pdf/renderer")
+        const blob = await pdf(memoizedDocument as any).toBlob()
+        const url = URL.createObjectURL(blob)
+        const link = window.document.createElement("a")
+        link.href = url
+        link.download = filename
+        if (typeof window !== "undefined" && window.document.body) {
+          window.document.body.appendChild(link)
+          link.click()
+          window.document.body.removeChild(link)
+        }
+        URL.revokeObjectURL(url)
+      } else {
+        throw new Error("No PDF source provided")
       }
-      URL.revokeObjectURL(url)
     } catch (error) {
       console.error("Error generating PDF:", error)
       console.error("Error details:", error instanceof Error ? error.stack : error)
@@ -77,7 +93,7 @@ export function PDFViewerModal({
           </div>
         </DialogHeader>
         <div className="flex-1 overflow-auto border rounded-lg bg-gray-50">
-          <PDFViewer document={memoizedDocument} />
+          <PDFViewer document={memoizedDocument} pdfUrl={providedPdfUrl} />
         </div>
       </DialogContent>
     </Dialog>
@@ -85,12 +101,32 @@ export function PDFViewerModal({
 }
 
 // Client-side PDF viewer component
-function PDFViewer({ document }: { document: React.ReactElement }) {
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+function PDFViewer({ 
+  document, 
+  pdfUrl: providedPdfUrl 
+}: { 
+  document?: React.ReactElement
+  pdfUrl?: string 
+}) {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(providedPdfUrl || null)
+  const [isLoading, setIsLoading] = useState(!providedPdfUrl)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // If PDF URL is provided, use it directly
+    if (providedPdfUrl) {
+      setPdfUrl(providedPdfUrl)
+      setIsLoading(false)
+      return
+    }
+
+    // Otherwise, generate from document (may have React 19 issues)
+    if (!document) {
+      setError("No document or PDF URL provided")
+      setIsLoading(false)
+      return
+    }
+
     let isMounted = true
     let currentPdfUrl: string | null = null
 
@@ -104,6 +140,8 @@ function PDFViewer({ document }: { document: React.ReactElement }) {
           throw new Error("Invalid document structure")
         }
         
+        // Dynamic import to avoid SSR issues
+        const { pdf } = await import("@react-pdf/renderer")
         const blob = await pdf(document as any).toBlob()
         if (isMounted) {
           const url = URL.createObjectURL(blob)
@@ -123,13 +161,7 @@ function PDFViewer({ document }: { document: React.ReactElement }) {
       }
     }
 
-    // Only generate if document is valid
-    if (document) {
-      generatePDF()
-    } else {
-      setError("No document provided")
-      setIsLoading(false)
-    }
+    generatePDF()
 
     return () => {
       isMounted = false
@@ -137,7 +169,7 @@ function PDFViewer({ document }: { document: React.ReactElement }) {
         URL.revokeObjectURL(currentPdfUrl)
       }
     }
-  }, [document])
+  }, [document, providedPdfUrl])
 
   if (isLoading) {
     return (
