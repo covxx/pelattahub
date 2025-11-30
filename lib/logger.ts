@@ -68,6 +68,7 @@ export const EntityType = {
   VENDOR: "VENDOR",
   CUSTOMER: "CUSTOMER",
   USER: "USER",
+  ORDER: "ORDER",
 } as const
 
 

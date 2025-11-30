@@ -12,6 +12,7 @@ import {
   Settings,
   FileText,
   Search,
+  ShoppingCart,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -35,6 +36,12 @@ const navigation = [
     href: "/dashboard/receiving",
     icon: TruckIcon,
     roles: ["ADMIN", "RECEIVER"],
+  },
+  {
+    name: "Orders",
+    href: "/dashboard/orders",
+    icon: ShoppingCart,
+    roles: ["ADMIN"],
   },
   {
     name: "Users",

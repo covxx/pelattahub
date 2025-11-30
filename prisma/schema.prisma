@@ -39,6 +39,14 @@ enum ReceivingStatus {
   FINALIZED
 }
 
+// Order Status Enum
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  PICKING
+  SHIPPED
+}
+
 // User Model
 model User {
   id            String    @id @default(cuid())
@@ -56,6 +64,7 @@ model User {
   sessions         Session[]
   receivingEvents  ReceivingEvent[]
   auditLogs        AuditLog[]
+  orders           Order[]
   
   @@map("users")
 }
@@ -128,6 +137,9 @@ model Customer {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   
+  // Relations
+  orders         Order[]
+  
   @@map("customers")
 }
 
@@ -178,6 +190,7 @@ model Product {
   
   // Relations
   lots                   InventoryLot[]
+  orderItems             OrderItem[]
   
   @@map("products")
 }
@@ -228,10 +241,70 @@ model InventoryLot {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   
+  // Relations
+  allocations      OrderAllocation[]
+  
   @@index([product_id])
   @@index([receiving_event_id])
   @@index([received_date])
   @@index([expiry_date])
   @@index([status])
   @@map("inventory_lots")
+}
+
+// Order Model - Outbound Sales Orders
+model Order {
+  id            String       @id @default(uuid()) @db.Uuid
+  customer_id   String       @db.Uuid
+  customer      Customer     @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  po_number     String?      // Purchase Order Number from customer
+  delivery_date DateTime
+  status        OrderStatus  @default(DRAFT)
+  created_by    String
+  user          User         @relation(fields: [created_by], references: [id], onDelete: Restrict)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  items         OrderItem[]
+  
+  @@index([customer_id])
+  @@index([status])
+  @@index([delivery_date])
+  @@index([created_by])
+  @@map("orders")
+}
+
+// Order Item Model - Products ordered in an order
+model OrderItem {
+  id              String           @id @default(uuid()) @db.Uuid
+  order_id        String           @db.Uuid
+  order           Order            @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product_id      String
+  product         Product          @relation(fields: [product_id], references: [id], onDelete: Restrict)
+  quantity_ordered Int
+  
+  // Relations
+  allocations     OrderAllocation[]
+  
+  @@index([order_id])
+  @@index([product_id])
+  @@map("order_items")
+}
+
+// Order Allocation Model - Links Order Items to specific Inventory Lots (FIFO allocation)
+model OrderAllocation {
+  id                String        @id @default(uuid()) @db.Uuid
+  order_item_id     String        @db.Uuid
+  order_item        OrderItem     @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
+  inventory_lot_id  String        @db.Uuid
+  inventory_lot     InventoryLot  @relation(fields: [inventory_lot_id], references: [id], onDelete: Restrict)
+  quantity_allocated Int
+  
+  createdAt         DateTime      @default(now())
+  
+  @@unique([order_item_id, inventory_lot_id])
+  @@index([order_item_id])
+  @@index([inventory_lot_id])
+  @@map("order_allocations")
 }
