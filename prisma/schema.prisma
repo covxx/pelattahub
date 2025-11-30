@@ -134,12 +134,15 @@ model Customer {
   address        String?
   contact_email  String?
   active         Boolean  @default(true)
+  qbo_id         String?  // QuickBooks Online Customer ID
+  qbo_sync_token String?  // QBO SyncToken for optimistic locking
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   
   // Relations
   orders         Order[]
   
+  @@index([qbo_id])
   @@map("customers")
 }
 
@@ -185,6 +188,8 @@ model Product {
   standard_case_weight   Float?         // Weight in LBS of 1 case (e.g., 40.0 for apple case)
   target_temp_f          Int?           // Storage temp in Fahrenheit (useful for produce)
   image_url              String?
+  qbo_id                 String?        // QuickBooks Online Item ID
+  qbo_sync_token         String?        // QBO SyncToken for optimistic locking
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
   
@@ -192,6 +197,7 @@ model Product {
   lots                   InventoryLot[]
   orderItems             OrderItem[]
   
+  @@index([qbo_id])
   @@map("products")
 }
 
@@ -307,4 +313,19 @@ model OrderAllocation {
   @@index([order_item_id])
   @@index([inventory_lot_id])
   @@map("order_allocations")
+}
+
+// Integration Settings Model - Stores OAuth tokens and integration config
+model IntegrationSettings {
+  id            String   @id @default(uuid()) @db.Uuid
+  provider      String   @unique // e.g., "quickbooks_online"
+  access_token  String   @db.Text // Encrypted access token
+  refresh_token String?  @db.Text // Encrypted refresh token
+  expires_at    DateTime? // Token expiration timestamp
+  realm_id      String?  // QBO Company ID (realm)
+  metadata      Json?    // Additional provider-specific data
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("integration_settings")
 }

@@ -13,6 +13,7 @@ import {
   FileText,
   Search,
   ShoppingCart,
+  Link2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -68,6 +69,12 @@ const adminNavigation = [
     name: "Traceability",
     href: "/dashboard/admin/traceability",
     icon: Search,
+    roles: ["ADMIN"],
+  },
+  {
+    name: "QuickBooks Sync",
+    href: "/dashboard/admin/integrations/qbo",
+    icon: Link2,
     roles: ["ADMIN"],
   },
 ]
