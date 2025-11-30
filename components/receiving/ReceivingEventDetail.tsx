@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ReceivingReceipt } from "@/components/print/ReceivingReceipt"
 import { Printer, FileText, ArrowLeft } from "lucide-react"
 import { finalizeReceivingEvent } from "@/app/actions/receiving"
 import { getCompanySettings } from "@/app/actions/settings"
@@ -13,6 +12,8 @@ import { generateMasterLabel, generatePTILabel } from "@/lib/zpl-generator"
 import { printZplViaBrowser } from "@/lib/print-service"
 import { useToast } from "@/hooks/useToast"
 import { ToastContainer } from "@/components/ui/toast"
+import { ReceivingReceiptPDF } from "@/components/documents/ReceivingReceiptPDF"
+import { PDFViewerModal } from "@/components/documents/PDFViewerModal"
 
 interface ReceivingEventDetailProps {
   event: any
@@ -26,6 +27,7 @@ export function ReceivingEventDetail({
   const router = useRouter()
   const [isEditMode, setIsEditMode] = useState(false)
   const [companySettings, setCompanySettings] = useState<any>(null)
+  const [showPDFModal, setShowPDFModal] = useState(false)
   const { toast, toasts, removeToast } = useToast()
 
   // Fetch company settings on mount
@@ -42,32 +44,11 @@ export function ReceivingEventDetail({
   }, [])
 
   const handlePrintReceipt = () => {
-    const printWindow = window.open("", "_blank", "width=800,height=600")
-    if (!printWindow) {
-      alert("Please allow popups to print the receipt")
+    if (!companySettings) {
+      toast("Loading company settings...", "info")
       return
     }
-
-    const receiptContainer = document.getElementById("receipt-container")
-    if (!receiptContainer) return
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receiving Receipt #${event.id.slice(0, 8).toUpperCase()}</title>
-          <meta charset="utf-8">
-        </head>
-        <body>
-          ${receiptContainer.innerHTML}
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.onload = () => {
-      printWindow.focus()
-      printWindow.print()
-    }
+    setShowPDFModal(true)
   }
 
   const handlePrintAllLabels = () => {
@@ -183,10 +164,21 @@ export function ReceivingEventDetail({
         </span>
       </div>
 
-      {/* Hidden receipt for printing */}
-      <div id="receipt-container" style={{ display: "none" }}>
-        <ReceivingReceipt receivingEvent={event} />
-      </div>
+      {/* PDF Modal */}
+      {companySettings && (
+        <PDFViewerModal
+          open={showPDFModal}
+          onOpenChange={setShowPDFModal}
+          document={
+            <ReceivingReceiptPDF
+              receivingEvent={event}
+              companySettings={companySettings}
+            />
+          }
+          filename={`Receiving_Receipt_${event.id.slice(0, 8).toUpperCase()}.pdf`}
+          title={`Receiving Receipt #${event.id.slice(0, 8).toUpperCase()}`}
+        />
+      )}
 
       {/* Event Details */}
       <Card>
