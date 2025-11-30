@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Download, X, Printer } from "lucide-react"
 
@@ -185,7 +185,12 @@ export function PDFViewerModal({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle>{title || "PDF Document"}</DialogTitle>
+            <div>
+              <DialogTitle>{title || "PDF Document"}</DialogTitle>
+              <DialogDescription className="sr-only">
+                View, print, or download the PDF document
+              </DialogDescription>
+            </div>
             <div className="flex gap-2">
               <Button
                 variant="outline"
