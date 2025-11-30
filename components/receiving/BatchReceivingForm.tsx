@@ -35,7 +35,8 @@ import { RuggedInput } from "@/components/rugged/RuggedInput"
 import { UnitToggle } from "@/components/rugged/UnitToggle"
 import { BigButton } from "@/components/rugged/BigButton"
 import { FlashConfirmation } from "@/components/receiving/FlashConfirmation"
-import { ReceivingReceipt } from "@/components/print/ReceivingReceipt"
+import { ReceivingReceiptPDF } from "@/components/documents/ReceivingReceiptPDF"
+import { PDFViewerModal } from "@/components/documents/PDFViewerModal"
 import { VendorCombobox } from "@/components/receiving/VendorCombobox"
 import { ProductCombobox } from "@/components/receiving/ProductCombobox"
 import { receiveBatchInventory } from "@/app/actions/receiving"
@@ -150,6 +151,7 @@ export function BatchReceivingForm({
   const [showFlash, setShowFlash] = useState(false)
   const [lastLotNumber, setLastLotNumber] = useState<string>("")
   const [companySettings, setCompanySettings] = useState<any>(null)
+  const [showPDFModal, setShowPDFModal] = useState(false)
   const { toast, toasts, removeToast } = useToast()
 
   const today = new Date().toISOString().split("T")[0]
@@ -338,37 +340,11 @@ export function BatchReceivingForm({
   }
 
   const handlePrintReceipt = () => {
-    // Create a new window for the receipt
-    const printWindow = window.open("", "_blank", "width=800,height=600")
-    if (!printWindow) {
-      alert("Please allow popups to print the receipt")
+    if (!companySettings) {
+      toast("Loading company settings...", "info")
       return
     }
-
-    // Get the receipt HTML
-    const receiptContainer = document.getElementById("receipt-container")
-    if (!receiptContainer) return
-
-    // Write the HTML to the new window
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receiving Receipt #${receivingEvent.id.slice(0, 8).toUpperCase()}</title>
-          <meta charset="utf-8">
-        </head>
-        <body>
-          ${receiptContainer.innerHTML}
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-
-    // Wait for content to load, then print
-    printWindow.onload = () => {
-      printWindow.focus()
-      printWindow.print()
-    }
+    setShowPDFModal(true)
   }
 
   const handleNewReceiving = () => {
@@ -410,10 +386,21 @@ export function BatchReceivingForm({
           </div>
         </div>
 
-        {/* Hidden receipt for printing */}
-        <div id="receipt-container" style={{ display: "none" }}>
-          <ReceivingReceipt receivingEvent={receivingEvent} />
-        </div>
+        {/* PDF Modal */}
+        {companySettings && (
+          <PDFViewerModal
+            open={showPDFModal}
+            onOpenChange={setShowPDFModal}
+            document={
+              <ReceivingReceiptPDF
+                receivingEvent={receivingEvent}
+                companySettings={companySettings}
+              />
+            }
+            filename={`Receiving_Receipt_${receivingEvent.id.slice(0, 8).toUpperCase()}.pdf`}
+            title={`Receiving Receipt #${receivingEvent.id.slice(0, 8).toUpperCase()}`}
+          />
+        )}
 
         {/* Interactive summary table */}
         <Card>
