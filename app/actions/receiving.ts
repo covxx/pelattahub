@@ -65,6 +65,7 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
             default_origin_country: true,
             unit_type: true,
             variety: true,
+            standard_case_weight: true,
           },
         })
 
@@ -108,6 +109,7 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
                 gtin: true,
                 variety: true,
                 unit_type: true,
+                standard_case_weight: true,
               },
             },
           },
@@ -213,6 +215,7 @@ export async function getReceivingEvent(id: string) {
               gtin: true,
               variety: true,
               unit_type: true,
+              standard_case_weight: true,
             },
           },
         },

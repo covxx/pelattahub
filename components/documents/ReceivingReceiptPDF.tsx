@@ -163,26 +163,74 @@ export function ReceivingReceiptPDF({
   receivingEvent,
   companySettings,
 }: ReceivingReceiptPDFProps) {
-  const receivedDate = new Date(receivingEvent.received_date)
-  const formattedDate = receivedDate.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
-  const receiptNumber = receivingEvent.id.slice(0, 8).toUpperCase()
+  // Validate required data
+  if (!receivingEvent) {
+    return (
+      <Document>
+        <Page size="LETTER" style={styles.page}>
+          <View>
+            <Text style={{ color: "red", fontSize: 12 }}>
+              Error: No receiving event data provided
+            </Text>
+          </View>
+        </Page>
+      </Document>
+    )
+  }
 
-  // Calculate totals
-  const totalQuantity = receivingEvent.lots.reduce(
-    (sum, lot) => sum + lot.original_quantity,
-    0
-  )
-  const totalWeight = receivingEvent.lots.reduce((sum, lot) => {
-    const weight =
-      lot.product.standard_case_weight && lot.product.unit_type === "CASE"
-        ? lot.product.standard_case_weight * lot.original_quantity
-        : 0
-    return sum + weight
-  }, 0)
+  if (!receivingEvent.vendor) {
+    return (
+      <Document>
+        <Page size="LETTER" style={styles.page}>
+          <View>
+            <Text style={{ color: "red", fontSize: 12 }}>
+              Error: Missing vendor information
+            </Text>
+          </View>
+        </Page>
+      </Document>
+    )
+  }
+
+  if (!receivingEvent.lots || receivingEvent.lots.length === 0) {
+    return (
+      <Document>
+        <Page size="LETTER" style={styles.page}>
+          <View>
+            <Text style={{ color: "red", fontSize: 12 }}>
+              Error: No lots found in receiving event
+            </Text>
+          </View>
+        </Page>
+      </Document>
+    )
+  }
+
+  try {
+    const receivedDate = new Date(receivingEvent.received_date)
+    const formattedDate = receivedDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+    const receiptNumber = receivingEvent.id?.slice(0, 8).toUpperCase() || "UNKNOWN"
+
+    // Calculate totals
+    const totalQuantity = receivingEvent.lots.reduce(
+      (sum, lot) => sum + (lot.original_quantity || 0),
+      0
+    )
+    const totalWeight = receivingEvent.lots.reduce((sum, lot) => {
+      const product = lot.product || {}
+      const standardCaseWeight = product.standard_case_weight ?? null
+      const unitType = product.unit_type || "CASE"
+      
+      const weight =
+        standardCaseWeight && unitType === "CASE"
+          ? standardCaseWeight * (lot.original_quantity || 0)
+          : 0
+      return sum + weight
+    }, 0)
 
   return (
     <Document>
@@ -265,22 +313,26 @@ export function ReceivingReceiptPDF({
 
             {/* Table Rows */}
             {receivingEvent.lots.map((lot) => {
+              // Safely access product fields with fallbacks
+              const product = lot.product || {}
+              const standardCaseWeight = product.standard_case_weight ?? null
+              const unitType = product.unit_type || "CASE"
+              
               const weight =
-                lot.product.standard_case_weight &&
-                lot.product.unit_type === "CASE"
-                  ? lot.product.standard_case_weight * lot.original_quantity
+                standardCaseWeight && unitType === "CASE"
+                  ? standardCaseWeight * (lot.original_quantity || 0)
                   : null
 
               return (
                 <View key={lot.id} style={styles.tableRow}>
-                  <Text style={styles.colLot}>{lot.lot_number}</Text>
+                  <Text style={styles.colLot}>{lot.lot_number || "N/A"}</Text>
                   <Text style={styles.colProduct}>
-                    {lot.product.name}
-                    {lot.product.variety && ` (${lot.product.variety})`}
+                    {product.name || "Unknown Product"}
+                    {product.variety && ` (${product.variety})`}
                   </Text>
-                  <Text style={styles.colSku}>{lot.product.sku}</Text>
-                  <Text style={styles.colQty}>{lot.original_quantity}</Text>
-                  <Text style={styles.colUnit}>{lot.product.unit_type}</Text>
+                  <Text style={styles.colSku}>{product.sku || "N/A"}</Text>
+                  <Text style={styles.colQty}>{lot.original_quantity || 0}</Text>
+                  <Text style={styles.colUnit}>{unitType}</Text>
                   <Text style={styles.colWeight}>
                     {weight ? weight.toFixed(2) : "-"}
                   </Text>
@@ -311,6 +363,26 @@ export function ReceivingReceiptPDF({
         </View>
       </Page>
     </Document>
-  )
+    )
+  } catch (error) {
+    // Error fallback - show error message in PDF
+    return (
+      <Document>
+        <Page size="LETTER" style={styles.page}>
+          <View>
+            <Text style={{ color: "red", fontSize: 12, marginBottom: 10 }}>
+              Error generating PDF:
+            </Text>
+            <Text style={{ fontSize: 10, color: "#666" }}>
+              {error instanceof Error ? error.message : "Unknown error"}
+            </Text>
+            <Text style={{ fontSize: 8, color: "#999", marginTop: 20 }}>
+              Receipt ID: {receivingEvent.id || "Unknown"}
+            </Text>
+          </View>
+        </Page>
+      </Document>
+    )
+  }
 }
 

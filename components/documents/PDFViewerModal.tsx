@@ -97,6 +97,7 @@ function PDFViewer({ document }: { document: React.ReactElement }) {
         }
       } catch (error) {
         console.error("Error generating PDF:", error)
+        console.error("PDF Document:", document)
         if (isMounted) {
           setIsLoading(false)
         }
