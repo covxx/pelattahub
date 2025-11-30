@@ -52,13 +52,32 @@ export async function GET(request: NextRequest) {
       })),
     }
 
-    // Generate PDF buffer using React.createElement to avoid JSX in API route
-    const pdfElement = React.createElement(ReceivingReceiptPDF, {
-      receivingEvent: serializedEvent,
-      companySettings: companySettings,
-    })
+    // Generate PDF buffer - wrap in try-catch to handle React 19 compatibility issues
+    let pdfBuffer: Buffer
     
-    const pdfBuffer = await renderToBuffer(pdfElement as any)
+    try {
+      const pdfElement = React.createElement(ReceivingReceiptPDF, {
+        receivingEvent: serializedEvent,
+        companySettings: companySettings,
+      })
+      
+      // Try renderToBuffer first
+      pdfBuffer = await renderToBuffer(pdfElement as any)
+    } catch (bufferError) {
+      // If renderToBuffer fails due to React 19 issues, try alternative approach
+      console.error("renderToBuffer failed, trying alternative:", bufferError)
+      
+      // Use pdf().toBlob() approach via dynamic import
+      const { pdf } = await import("@react-pdf/renderer")
+      const pdfElement = React.createElement(ReceivingReceiptPDF, {
+        receivingEvent: serializedEvent,
+        companySettings: companySettings,
+      })
+      
+      const blob = await pdf(pdfElement as any).toBlob()
+      const arrayBuffer = await blob.arrayBuffer()
+      pdfBuffer = Buffer.from(arrayBuffer)
+    }
 
     // Convert buffer to Uint8Array for NextResponse
     const pdfArray = new Uint8Array(pdfBuffer)
