@@ -186,8 +186,12 @@ export function BatchReceivingForm({
     setButtonState("loading")
     startTransition(async () => {
       try {
+        // Use current date/time when receiving (not just date at midnight)
+        // This ensures we track the exact time of receipt
+        const receivedDateTime = new Date()
+        
         const result = await receiveBatchInventory({
-          date: new Date(data.date),
+          date: receivedDateTime,
           vendorId: data.vendorId,
           items: data.items.map((item) => ({
             productId: item.productId,

@@ -202,7 +202,7 @@ export function ProductDetailSheet({
                               {lot.lot_number}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Received {formatDistanceToNow(receivedDate, { addSuffix: true })}
+                              Received {format(receivedDate, "MMM dd, yyyy 'at' h:mm a")}
                             </p>
                           </div>
                           <Badge
