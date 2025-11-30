@@ -31,9 +31,13 @@ export function PDFViewerModal({
     setIsGenerating(true)
     try {
       if (providedPdfUrl) {
-        // If PDF URL is provided, download directly
+        // If PDF URL is provided, add download parameter or create download link
+        const downloadUrl = providedPdfUrl.includes("?") 
+          ? `${providedPdfUrl}&download=true`
+          : `${providedPdfUrl}?download=true`
+        
         const link = window.document.createElement("a")
-        link.href = providedPdfUrl
+        link.href = downloadUrl
         link.download = filename
         if (typeof window !== "undefined" && window.document.body) {
           window.document.body.appendChild(link)
@@ -66,64 +70,149 @@ export function PDFViewerModal({
     }
   }
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (providedPdfUrl) {
-      // Open PDF in new window and print
-      const printWindow = window.open(providedPdfUrl, "_blank")
-      if (printWindow) {
-        // Wait for PDF to load, then trigger print dialog
-        const checkLoad = setInterval(() => {
+      // Fetch PDF as blob first to ensure it opens in browser viewer, not downloads
+      try {
+        // Remove any existing query params and add print=true
+        const baseUrl = providedPdfUrl.split("?")[0]
+        const printUrl = `${baseUrl}?print=true`
+        
+        // Fetch as blob to create a local URL that won't trigger download
+        const response = await fetch(printUrl)
+        if (!response.ok) {
+          throw new Error("Failed to fetch PDF")
+        }
+        
+        const blob = await response.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        
+        // Open blob URL in new window - this will use browser's native PDF viewer
+        const printWindow = window.open(blobUrl, "_blank")
+        
+        if (!printWindow) {
+          alert("Please allow popups for this site to enable printing")
+          URL.revokeObjectURL(blobUrl)
+          return
+        }
+        
+        // Wait for PDF to load in browser's native viewer, then trigger print
+        let printAttempted = false
+        
+        const attemptPrint = () => {
+          if (printAttempted) return
+          printAttempted = true
+          
           try {
-            if (printWindow.document.readyState === "complete") {
-              clearInterval(checkLoad)
+            if (printWindow && !printWindow.closed) {
+              printWindow.focus()
+              // Small delay to ensure PDF is rendered
               setTimeout(() => {
                 printWindow.print()
-              }, 500) // Small delay to ensure PDF is fully rendered
+                // Clean up blob URL after printing
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+              }, 1000)
             }
           } catch (e) {
-            // Cross-origin or other error - try printing anyway
-            clearInterval(checkLoad)
-            setTimeout(() => {
-              printWindow.print()
-            }, 1000)
+            // Cross-origin or other error - user can manually print
+            console.log("Auto-print blocked, user can use Ctrl+P or browser print button")
+            URL.revokeObjectURL(blobUrl)
           }
-        }, 100)
+        }
         
-        // Fallback timeout
-        setTimeout(() => {
-          clearInterval(checkLoad)
+        // Strategy 1: Wait for window load event
+        printWindow.addEventListener("load", () => {
+          setTimeout(attemptPrint, 1500)
+        }, { once: true })
+        
+        // Strategy 2: Poll for window readiness
+        const checkReady = setInterval(() => {
           try {
-            printWindow.print()
-          } catch (e) {
-            console.error("Print error:", e)
-          }
-        }, 3000)
-      }
-    } else if (memoizedDocument) {
-      // For client-side generated PDFs, generate blob and print
-      setIsGenerating(true)
-      import("@react-pdf/renderer").then(({ pdf }) => {
-        pdf(memoizedDocument as any)
-          .toBlob()
-          .then((blob) => {
-            const url = URL.createObjectURL(blob)
-            const printWindow = window.open(url, "_blank")
-            if (printWindow) {
-              printWindow.onload = () => {
-                setTimeout(() => {
-                  printWindow.print()
-                  URL.revokeObjectURL(url)
-                }, 500)
+            if (printWindow && !printWindow.closed && printWindow.document) {
+              if (printWindow.document.readyState === "complete") {
+                clearInterval(checkReady)
+                setTimeout(attemptPrint, 1000)
               }
+            } else if (printWindow?.closed) {
+              clearInterval(checkReady)
+              URL.revokeObjectURL(blobUrl)
+            }
+          } catch (e) {
+            // Cross-origin - can't check, try printing anyway
+            clearInterval(checkReady)
+            setTimeout(attemptPrint, 2000)
+          }
+        }, 300)
+        
+        // Strategy 3: Fallback timeout
+        setTimeout(() => {
+          clearInterval(checkReady)
+          if (!printAttempted) {
+            attemptPrint()
+          }
+        }, 4000)
+      } catch (error) {
+        console.error("Error fetching PDF for print:", error)
+        // Fallback: try opening URL directly
+        const printWindow = window.open(providedPdfUrl, "_blank")
+        if (printWindow) {
+          setTimeout(() => {
+            printWindow.print()
+          }, 2000)
+        }
+      }
+      
+    } else if (memoizedDocument) {
+      // For client-side generated PDFs, generate blob and open in native viewer
+      setIsGenerating(true)
+      try {
+        const { pdf } = await import("@react-pdf/renderer")
+        const blob = await pdf(memoizedDocument as any).toBlob()
+        const blobUrl = URL.createObjectURL(blob)
+        
+        // Open in browser's native PDF viewer
+        const printWindow = window.open(blobUrl, "_blank")
+        
+        if (!printWindow) {
+          alert("Please allow popups for this site to enable printing")
+          setIsGenerating(false)
+          URL.revokeObjectURL(blobUrl)
+          return
+        }
+        
+        // Wait for PDF to load, then print
+        printWindow.addEventListener("load", () => {
+          setTimeout(() => {
+            try {
+              printWindow.focus()
+              printWindow.print()
+            } catch (e) {
+              console.log("Auto-print blocked, user can use Ctrl+P")
             }
             setIsGenerating(false)
-          })
-          .catch((error) => {
-            console.error("Error generating PDF for print:", error)
-            setIsGenerating(false)
-            alert("Failed to generate PDF for printing")
-          })
-      })
+            // Clean up blob URL after a delay
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+          }, 1000)
+        }, { once: true })
+        
+        // Fallback
+        setTimeout(() => {
+          try {
+            if (printWindow && !printWindow.closed) {
+              printWindow.focus()
+              printWindow.print()
+            }
+          } catch (e) {
+            console.log("Auto-print blocked")
+          }
+          setIsGenerating(false)
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+        }, 2000)
+      } catch (error) {
+        console.error("Error generating PDF for print:", error)
+        setIsGenerating(false)
+        alert("Failed to generate PDF for printing")
+      }
     }
   }
 

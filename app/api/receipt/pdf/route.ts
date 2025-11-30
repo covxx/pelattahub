@@ -82,11 +82,24 @@ export async function GET(request: NextRequest) {
     // Convert buffer to Uint8Array for NextResponse
     const pdfArray = new Uint8Array(pdfBuffer)
     
+    // Check if this is a download request (via query param) or regular view/print
+    const isDownload = searchParams.get("download") === "true"
+    const isPrint = searchParams.get("print") === "true"
+    
     // Return PDF as response
+    // Use 'inline' for viewing/printing (opens in browser viewer), 'attachment' for download
     return new NextResponse(pdfArray, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Receiving_Receipt_${eventId.slice(0, 8).toUpperCase()}.pdf"`,
+        "Content-Disposition": isDownload 
+          ? `attachment; filename="Receiving_Receipt_${eventId.slice(0, 8).toUpperCase()}.pdf"`
+          : `inline; filename="Receiving_Receipt_${eventId.slice(0, 8).toUpperCase()}.pdf"`,
+        // Prevent caching for print requests to ensure fresh PDF
+        ...(isPrint ? {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        } : {}),
       },
     })
   } catch (error) {
