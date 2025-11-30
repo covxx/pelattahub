@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { unstable_noStore as noStore } from "next/cache"
 
 interface InventoryCatalogFilters {
   activeOnly?: boolean
@@ -11,8 +12,14 @@ interface InventoryCatalogFilters {
 
 /**
  * Get inventory catalog with aggregated lot data
+ * 
+ * Note: Uses noStore() to prevent caching - WMS data is highly dynamic
+ * and must always reflect real-time inventory levels.
  */
 export async function getInventoryCatalog(filters: InventoryCatalogFilters = {}) {
+  // Prevent Next.js from caching this data - warehouse inventory is highly dynamic
+  noStore()
+  
   const { activeOnly = true, search = "" } = filters
 
   const where: any = {}

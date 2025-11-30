@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { unstable_noStore as noStore } from "next/cache"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 
 interface BatchReceivingItem {
@@ -152,8 +153,13 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
 
 /**
  * Get all receiving events with their lots
+ * 
+ * Note: Uses noStore() to prevent caching - receiving data is highly dynamic
  */
 export async function getReceivingEvents(limit = 50) {
+  // Prevent Next.js from caching this data - receiving events change frequently
+  noStore()
+  
   const events = await prisma.receivingEvent.findMany({
     take: limit,
     orderBy: {
@@ -219,6 +225,8 @@ export async function getReceivingEvent(id: string) {
 
 /**
  * Get receiving events with date range filter
+ * 
+ * Note: Uses noStore() to prevent caching - receiving history is highly dynamic
  */
 export async function getReceivingHistory(filters?: {
   startDate?: Date
@@ -226,6 +234,9 @@ export async function getReceivingHistory(filters?: {
   vendorId?: string
   status?: "OPEN" | "FINALIZED"
 }) {
+  // Prevent Next.js from caching this data - receiving events change frequently
+  noStore()
+  
   const where: any = {}
 
   if (filters?.startDate || filters?.endDate) {

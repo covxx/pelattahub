@@ -197,6 +197,8 @@ model Product {
   lots                   InventoryLot[]
   orderItems             OrderItem[]
   
+  @@index([sku])
+  @@index([gtin])
   @@index([qbo_id])
   @@map("products")
 }
@@ -251,10 +253,11 @@ model InventoryLot {
   allocations      OrderAllocation[]
   
   @@index([product_id])
+  @@index([lot_number])
+  @@index([status])
   @@index([receiving_event_id])
   @@index([received_date])
   @@index([expiry_date])
-  @@index([status])
   @@map("inventory_lots")
 }
 
