@@ -14,6 +14,7 @@ import {
   Search,
   ShoppingCart,
   Link2,
+  Activity,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -75,6 +76,12 @@ const adminNavigation = [
     name: "QuickBooks Sync",
     href: "/dashboard/admin/integrations/qbo",
     icon: Link2,
+    roles: ["ADMIN"],
+  },
+  {
+    name: "System Health",
+    href: "/dashboard/admin/health",
+    icon: Activity,
     roles: ["ADMIN"],
   },
 ]
