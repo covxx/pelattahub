@@ -387,13 +387,25 @@ export function BatchReceivingForm({
         </div>
 
         {/* PDF Modal */}
-        {companySettings && (
+        {companySettings && receivingEvent && (
           <PDFViewerModal
             open={showPDFModal}
             onOpenChange={setShowPDFModal}
             document={
               <ReceivingReceiptPDF
-                receivingEvent={receivingEvent}
+                receivingEvent={{
+                  ...receivingEvent,
+                  received_date: receivingEvent.received_date instanceof Date 
+                    ? receivingEvent.received_date.toISOString() 
+                    : receivingEvent.received_date,
+                  lots: receivingEvent.lots?.map((lot: any) => ({
+                    ...lot,
+                    product: {
+                      ...lot.product,
+                      standard_case_weight: lot.product?.standard_case_weight ?? null,
+                    },
+                  })) || [],
+                }}
                 companySettings={companySettings}
               />
             }

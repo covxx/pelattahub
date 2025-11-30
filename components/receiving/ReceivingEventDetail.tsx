@@ -165,13 +165,25 @@ export function ReceivingEventDetail({
       </div>
 
       {/* PDF Modal */}
-      {companySettings && (
+      {companySettings && event && (
         <PDFViewerModal
           open={showPDFModal}
           onOpenChange={setShowPDFModal}
           document={
             <ReceivingReceiptPDF
-              receivingEvent={event}
+              receivingEvent={{
+                ...event,
+                received_date: event.received_date instanceof Date 
+                  ? event.received_date.toISOString() 
+                  : event.received_date,
+                lots: event.lots?.map((lot: any) => ({
+                  ...lot,
+                  product: {
+                    ...lot.product,
+                    standard_case_weight: lot.product?.standard_case_weight ?? null,
+                  },
+                })) || [],
+              }}
               companySettings={companySettings}
             />
           }

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Download, X } from "lucide-react"
@@ -22,11 +22,15 @@ export function PDFViewerModal({
   title,
 }: PDFViewerModalProps) {
   const [isGenerating, setIsGenerating] = useState(false)
+  
+  // Memoize the document to prevent recreation on every render
+  const memoizedDocument = useMemo(() => pdfDocument, [pdfDocument])
 
   const handleDownload = async () => {
     setIsGenerating(true)
     try {
-      const blob = await pdf(pdfDocument as any).toBlob()
+      // Use memoized document
+      const blob = await pdf(memoizedDocument as any).toBlob()
       const url = URL.createObjectURL(blob)
       const link = window.document.createElement("a")
       link.href = url
@@ -39,7 +43,8 @@ export function PDFViewerModal({
       URL.revokeObjectURL(url)
     } catch (error) {
       console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
+      console.error("Error details:", error instanceof Error ? error.stack : error)
+      alert(`Failed to generate PDF: ${error instanceof Error ? error.message : "Unknown error"}`)
     } finally {
       setIsGenerating(false)
     }
@@ -72,7 +77,7 @@ export function PDFViewerModal({
           </div>
         </DialogHeader>
         <div className="flex-1 overflow-auto border rounded-lg bg-gray-50">
-          <PDFViewer document={pdfDocument} />
+          <PDFViewer document={memoizedDocument} />
         </div>
       </DialogContent>
     </Dialog>
@@ -83,33 +88,53 @@ export function PDFViewerModal({
 function PDFViewer({ document }: { document: React.ReactElement }) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
+    let currentPdfUrl: string | null = null
 
     const generatePDF = async () => {
       try {
+        setIsLoading(true)
+        setError(null)
+        
+        // Validate document structure
+        if (!document || typeof document !== "object") {
+          throw new Error("Invalid document structure")
+        }
+        
         const blob = await pdf(document as any).toBlob()
         if (isMounted) {
           const url = URL.createObjectURL(blob)
+          currentPdfUrl = url
           setPdfUrl(url)
           setIsLoading(false)
         }
       } catch (error) {
         console.error("Error generating PDF:", error)
+        console.error("Error details:", error instanceof Error ? error.stack : error)
+        console.error("PDF Document type:", typeof document)
         console.error("PDF Document:", document)
         if (isMounted) {
+          setError(error instanceof Error ? error.message : "Failed to generate PDF")
           setIsLoading(false)
         }
       }
     }
 
-    generatePDF()
+    // Only generate if document is valid
+    if (document) {
+      generatePDF()
+    } else {
+      setError("No document provided")
+      setIsLoading(false)
+    }
 
     return () => {
       isMounted = false
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl)
+      if (currentPdfUrl) {
+        URL.revokeObjectURL(currentPdfUrl)
       }
     }
   }, [document])
@@ -120,6 +145,18 @@ function PDFViewer({ document }: { document: React.ReactElement }) {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
           <p className="text-muted-foreground">Generating PDF...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center p-4">
+          <p className="text-red-600 font-semibold mb-2">Failed to generate PDF</p>
+          <p className="text-sm text-gray-600">{error}</p>
+          <p className="text-xs text-gray-500 mt-2">Check browser console for details</p>
         </div>
       </div>
     )
