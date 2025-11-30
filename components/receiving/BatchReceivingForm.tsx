@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useEffect } from "react"
+import React, { useState, useTransition, useEffect } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -387,28 +387,35 @@ export function BatchReceivingForm({
         </div>
 
         {/* PDF Modal */}
-        {companySettings && receivingEvent && (
+        {companySettings && receivingEvent && showPDFModal && (
           <PDFViewerModal
             open={showPDFModal}
             onOpenChange={setShowPDFModal}
-            document={
-              <ReceivingReceiptPDF
-                receivingEvent={{
-                  ...receivingEvent,
-                  received_date: receivingEvent.received_date instanceof Date 
-                    ? receivingEvent.received_date.toISOString() 
-                    : receivingEvent.received_date,
-                  lots: receivingEvent.lots?.map((lot: any) => ({
-                    ...lot,
-                    product: {
-                      ...lot.product,
-                      standard_case_weight: lot.product?.standard_case_weight ?? null,
-                    },
-                  })) || [],
-                }}
-                companySettings={companySettings}
-              />
-            }
+            document={React.createElement(ReceivingReceiptPDF, {
+              receivingEvent: {
+                ...receivingEvent,
+                received_date: receivingEvent.received_date instanceof Date 
+                  ? receivingEvent.received_date.toISOString() 
+                  : typeof receivingEvent.received_date === 'string'
+                  ? receivingEvent.received_date
+                  : new Date(receivingEvent.received_date).toISOString(),
+                lots: (receivingEvent.lots || []).map((lot: any) => ({
+                  ...lot,
+                  product: {
+                    ...lot.product,
+                    standard_case_weight: lot.product?.standard_case_weight ?? null,
+                    unit_type: lot.product?.unit_type || "CASE",
+                    name: lot.product?.name || "Unknown",
+                    sku: lot.product?.sku || "N/A",
+                    variety: lot.product?.variety || null,
+                  },
+                })),
+              },
+              companySettings: {
+                name: companySettings.name || "",
+                address: companySettings.address || "",
+              },
+            })}
             filename={`Receiving_Receipt_${receivingEvent.id.slice(0, 8).toUpperCase()}.pdf`}
             title={`Receiving Receipt #${receivingEvent.id.slice(0, 8).toUpperCase()}`}
           />

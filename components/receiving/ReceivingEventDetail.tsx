@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -165,28 +165,35 @@ export function ReceivingEventDetail({
       </div>
 
       {/* PDF Modal */}
-      {companySettings && event && (
+      {companySettings && event && showPDFModal && (
         <PDFViewerModal
           open={showPDFModal}
           onOpenChange={setShowPDFModal}
-          document={
-            <ReceivingReceiptPDF
-              receivingEvent={{
-                ...event,
-                received_date: event.received_date instanceof Date 
-                  ? event.received_date.toISOString() 
-                  : event.received_date,
-                lots: event.lots?.map((lot: any) => ({
-                  ...lot,
-                  product: {
-                    ...lot.product,
-                    standard_case_weight: lot.product?.standard_case_weight ?? null,
-                  },
-                })) || [],
-              }}
-              companySettings={companySettings}
-            />
-          }
+          document={React.createElement(ReceivingReceiptPDF, {
+            receivingEvent: {
+              ...event,
+              received_date: event.received_date instanceof Date 
+                ? event.received_date.toISOString() 
+                : typeof event.received_date === 'string'
+                ? event.received_date
+                : new Date(event.received_date).toISOString(),
+              lots: (event.lots || []).map((lot: any) => ({
+                ...lot,
+                product: {
+                  ...lot.product,
+                  standard_case_weight: lot.product?.standard_case_weight ?? null,
+                  unit_type: lot.product?.unit_type || "CASE",
+                  name: lot.product?.name || "Unknown",
+                  sku: lot.product?.sku || "N/A",
+                  variety: lot.product?.variety || null,
+                },
+              })),
+            },
+            companySettings: {
+              name: companySettings.name || "",
+              address: companySettings.address || "",
+            },
+          })}
           filename={`Receiving_Receipt_${event.id.slice(0, 8).toUpperCase()}.pdf`}
           title={`Receiving Receipt #${event.id.slice(0, 8).toUpperCase()}`}
         />
