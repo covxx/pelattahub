@@ -70,97 +70,34 @@ export function PDFViewerModal({
     }
   }
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (providedPdfUrl) {
-      // Fetch PDF as blob first to ensure it opens in browser viewer, not downloads
-      try {
-        // Remove any existing query params and add print=true
-        const baseUrl = providedPdfUrl.split("?")[0]
-        const printUrl = `${baseUrl}?print=true`
-        
-        // Fetch as blob to create a local URL that won't trigger download
-        const response = await fetch(printUrl)
-        if (!response.ok) {
-          throw new Error("Failed to fetch PDF")
-        }
-        
-        const blob = await response.blob()
-        const blobUrl = URL.createObjectURL(blob)
-        
-        // Open blob URL in new window - this will use browser's native PDF viewer
-        const printWindow = window.open(blobUrl, "_blank")
-        
-        if (!printWindow) {
-          alert("Please allow popups for this site to enable printing")
-          URL.revokeObjectURL(blobUrl)
-          return
-        }
-        
-        // Wait for PDF to load in browser's native viewer, then trigger print
-        let printAttempted = false
-        
-        const attemptPrint = () => {
-          if (printAttempted) return
-          printAttempted = true
-          
-          try {
-            if (printWindow && !printWindow.closed) {
-              printWindow.focus()
-              // Small delay to ensure PDF is rendered
-              setTimeout(() => {
-                printWindow.print()
-                // Clean up blob URL after printing
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
-              }, 1000)
-            }
-          } catch (e) {
-            // Cross-origin or other error - user can manually print
-            console.log("Auto-print blocked, user can use Ctrl+P or browser print button")
-            URL.revokeObjectURL(blobUrl)
-          }
-        }
-        
-        // Strategy 1: Wait for window load event
-        printWindow.addEventListener("load", () => {
-          setTimeout(attemptPrint, 1500)
-        }, { once: true })
-        
-        // Strategy 2: Poll for window readiness
-        const checkReady = setInterval(() => {
-          try {
-            if (printWindow && !printWindow.closed && printWindow.document) {
-              if (printWindow.document.readyState === "complete") {
-                clearInterval(checkReady)
-                setTimeout(attemptPrint, 1000)
-              }
-            } else if (printWindow?.closed) {
-              clearInterval(checkReady)
-              URL.revokeObjectURL(blobUrl)
-            }
-          } catch (e) {
-            // Cross-origin - can't check, try printing anyway
-            clearInterval(checkReady)
-            setTimeout(attemptPrint, 2000)
-          }
-        }, 300)
-        
-        // Strategy 3: Fallback timeout
-        setTimeout(() => {
-          clearInterval(checkReady)
-          if (!printAttempted) {
-            attemptPrint()
-          }
-        }, 4000)
-      } catch (error) {
-        console.error("Error fetching PDF for print:", error)
-        // Fallback: try opening URL directly
-        const printWindow = window.open(providedPdfUrl, "_blank")
-        if (printWindow) {
-          setTimeout(() => {
-            printWindow.print()
-          }, 2000)
-        }
+      // Simple approach: Open PDF URL directly in new window with print parameter
+      // The API will serve it with 'inline' disposition so it opens in browser viewer
+      const baseUrl = providedPdfUrl.split("?")[0]
+      const printUrl = `${baseUrl}?print=true`
+      
+      // Open in new window - browser will use native PDF viewer
+      const printWindow = window.open(printUrl, "_blank")
+      
+      if (!printWindow) {
+        alert("Please allow popups for this site to enable printing")
+        return
       }
+      
+      // Wait for PDF to load, then trigger print dialog
+      // Use a simple timeout approach since we can't reliably detect PDF load
+      setTimeout(() => {
+        try {
+          if (printWindow && !printWindow.closed) {
+            printWindow.focus()
+            printWindow.print()
+          }
+        } catch (e) {
+          // Cross-origin or other error - user can manually print with Ctrl+P
+          console.log("Auto-print may be blocked. Use Ctrl+P or browser print button.")
+        }
+      }, 1500) // Give PDF time to load in browser viewer
       
     } else if (memoizedDocument) {
       // For client-side generated PDFs, generate blob and open in native viewer
