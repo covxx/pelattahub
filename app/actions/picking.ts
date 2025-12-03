@@ -278,7 +278,7 @@ export async function getOrderForPicking(orderId: string) {
 
             return {
               ...lot,
-              remainingQty: Math.max(0, remainingQty), // Ensure non-negative
+              remaining_qty: Math.max(0, remainingQty), // Ensure non-negative
             }
           })
         )
