@@ -98,7 +98,7 @@ export async function importQboCustomers() {
     // Log activity
     await logActivity(
       session.user.id,
-      "SYNC",
+      AuditAction.SYNC,
       EntityType.CUSTOMER,
       "QBO_IMPORT",
       {
@@ -221,7 +221,7 @@ export async function importQboItems() {
     // Log activity
     await logActivity(
       session.user.id,
-      "SYNC",
+      AuditAction.SYNC,
       EntityType.PRODUCT,
       "QBO_IMPORT",
       {

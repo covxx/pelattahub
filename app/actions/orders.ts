@@ -266,8 +266,8 @@ export async function allocateOrder(orderId: string) {
     // Log activity
     await logActivity(
       session.user.id,
-      "ALLOCATE",
-      "ORDER",
+      AuditAction.ALLOCATE,
+      EntityType.ORDER,
       orderId,
       {
         summary: `Allocated order ${order.po_number || order.id.slice(0, 8)} using FIFO`,

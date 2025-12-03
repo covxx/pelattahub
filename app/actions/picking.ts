@@ -111,11 +111,35 @@ export async function getOrderForPicking(orderId: string) {
     // For each item, fetch available inventory lots and calculate remaining quantity
     const itemsWithAvailableLots = await Promise.all(
       order.items.map(async (item) => {
-        // Get all available lots for this product
+        // Get allocations for this order item to find which lots are already allocated
+        const allocations = await prisma.orderAllocation.findMany({
+          where: {
+            order_item_id: item.id,
+          },
+          select: {
+            inventory_lot_id: true,
+          },
+        })
+        const allocatedLotIds = allocations.map((a) => a.inventory_lot_id)
+
+        // Get lots that are either:
+        // 1. Available/Received/QC_Pending (matching allocation logic), OR
+        // 2. Already allocated to this order item (regardless of status)
         const availableLots = await prisma.inventoryLot.findMany({
           where: {
             product_id: item.product_id,
-            status: LotStatus.AVAILABLE,
+            OR: [
+              {
+                status: {
+                  in: [LotStatus.AVAILABLE, LotStatus.RECEIVED, LotStatus.QC_PENDING],
+                },
+              },
+              {
+                id: {
+                  in: allocatedLotIds,
+                },
+              },
+            ],
             quantity_current: {
               gt: 0, // Only lots with available quantity
             },
@@ -296,9 +320,28 @@ export async function submitPick(
         throw new Error("Lot does not match order item product")
       }
 
-      // Verify lot is available
-      if (lot.status !== LotStatus.AVAILABLE) {
-        throw new Error(`Lot ${lot.lot_number} is not available for picking`)
+      // Check if this lot is allocated to this order item
+      const isAllocated = await tx.orderAllocation.findUnique({
+        where: {
+          order_item_id_inventory_lot_id: {
+            order_item_id: orderItemId,
+            inventory_lot_id: lotId,
+          },
+        },
+      })
+
+      // Verify lot is available for picking:
+      // - Must be AVAILABLE, RECEIVED, or QC_PENDING (matching allocation logic), OR
+      // - Must be already allocated to this order item (regardless of status)
+      const allowedStatuses: LotStatus[] = [
+        LotStatus.AVAILABLE,
+        LotStatus.RECEIVED,
+        LotStatus.QC_PENDING,
+      ]
+      if (!isAllocated && !allowedStatuses.includes(lot.status as LotStatus)) {
+        throw new Error(
+          `Lot ${lot.lot_number} is not available for picking. Status: ${lot.status}`
+        )
       }
 
       // Calculate how much has already been picked for this item
@@ -413,9 +456,11 @@ export async function submitPick(
         return totalPicked >= item.quantity_ordered
       })
 
-      // Update order status if all items are fully picked
+      // Update order status based on picking progress
       let orderStatus: OrderStatus = orderItem.order.status
+      
       if (allItemsFullyPicked) {
+        // All items fully picked → READY_TO_SHIP
         orderStatus = OrderStatus.READY_TO_SHIP
         await tx.order.update({
           where: { id: orderItem.order.id },
@@ -424,19 +469,22 @@ export async function submitPick(
           },
         })
       } else {
-        // If not fully picked, set to PARTIAL_PICK or PICKING
+        // Not all items fully picked - determine appropriate status
         const hasAnyPicks = allOrderItems.some(
           (item) => item.picks.length > 0
         )
-        if (hasAnyPicks && orderItem.order.status === OrderStatus.CONFIRMED) {
-          orderStatus = OrderStatus.PARTIAL_PICK
-          await tx.order.update({
-            where: { id: orderItem.order.id },
-            data: {
-              status: OrderStatus.PARTIAL_PICK,
-            },
-          })
-        } else if (orderItem.order.status === OrderStatus.CONFIRMED) {
+        
+        // Check if any items are partially picked (some picked but not fully)
+        const hasPartiallyPickedItems = allOrderItems.some((item) => {
+          const totalPicked = item.picks.reduce(
+            (sum, pick) => sum + pick.quantity_picked,
+            0
+          )
+          return totalPicked > 0 && totalPicked < item.quantity_ordered
+        })
+        
+        if (orderItem.order.status === OrderStatus.CONFIRMED) {
+          // First pick on a CONFIRMED order → PICKING
           orderStatus = OrderStatus.PICKING
           await tx.order.update({
             where: { id: orderItem.order.id },
@@ -444,7 +492,20 @@ export async function submitPick(
               status: OrderStatus.PICKING,
             },
           })
+        } else if (
+          orderItem.order.status === OrderStatus.PICKING &&
+          hasPartiallyPickedItems
+        ) {
+          // Order is PICKING and has partially picked items → PARTIAL_PICK
+          orderStatus = OrderStatus.PARTIAL_PICK
+          await tx.order.update({
+            where: { id: orderItem.order.id },
+            data: {
+              status: OrderStatus.PARTIAL_PICK,
+            },
+          })
         }
+        // If already PARTIAL_PICK, keep it as PARTIAL_PICK (no change needed)
       }
 
       return {

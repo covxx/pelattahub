@@ -58,6 +58,12 @@ export const AuditAction = {
   UNPICK: "UNPICK",
   SHIP: "SHIP",
   
+  // Order Management
+  ALLOCATE: "ALLOCATE",
+  
+  // Integration/Sync
+  SYNC: "SYNC",
+  
   // Access
   LOGIN: "LOGIN",
   LOGOUT: "LOGOUT",
