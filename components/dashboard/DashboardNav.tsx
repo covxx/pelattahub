@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   Link2,
   Activity,
+  Hand,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -44,6 +45,12 @@ const navigation = [
     href: "/dashboard/orders",
     icon: ShoppingCart,
     roles: ["ADMIN"],
+  },
+  {
+    name: "Picking",
+    href: "/dashboard/orders",
+    icon: Hand,
+    roles: ["ADMIN", "PACKER"],
   },
   {
     name: "Users",

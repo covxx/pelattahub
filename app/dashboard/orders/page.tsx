@@ -1,8 +1,8 @@
 import { getOrders } from "@/app/actions/orders"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { Plus, Package } from "lucide-react"
 import { format } from "date-fns"
 
 export default async function OrdersPage() {
@@ -41,9 +41,13 @@ export default async function OrdersPage() {
                         ? "bg-gray-100 text-gray-800"
                         : order.status === "CONFIRMED"
                         ? "bg-blue-100 text-blue-800"
-                        : order.status === "PICKING"
+                        : order.status === "PICKING" || order.status === "PARTIAL_PICK"
                         ? "bg-yellow-100 text-yellow-800"
-                        : "bg-green-100 text-green-800"
+                        : order.status === "READY_TO_SHIP"
+                        ? "bg-purple-100 text-purple-800"
+                        : order.status === "SHIPPED"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
                     }`}
                   >
                     {order.status}
@@ -74,6 +78,19 @@ export default async function OrdersPage() {
                   </div>
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-end gap-2">
+                {(order.status === "CONFIRMED" ||
+                  order.status === "PICKING" ||
+                  order.status === "PARTIAL_PICK" ||
+                  order.status === "READY_TO_SHIP") && (
+                  <Link href={`/dashboard/orders/${order.id}/pick`}>
+                    <Button variant="default" size="sm">
+                      <Package className="h-4 w-4 mr-2" />
+                      Pick Order
+                    </Button>
+                  </Link>
+                )}
+              </CardFooter>
             </Card>
           ))}
         </div>
