@@ -191,13 +191,22 @@ export async function updateProduct(
     where: { id },
   })
 
+  // Validate required fields if provided
+  if (data.gtin !== undefined && !data.gtin) {
+    throw new Error("GTIN cannot be empty")
+  }
+
+  if (data.default_origin_country !== undefined && !data.default_origin_country) {
+    throw new Error("Default origin country cannot be empty")
+  }
+
   const product = await prisma.product.update({
     where: { id },
     data: {
       ...(data.sku && { sku: data.sku }),
       ...(data.name && { name: data.name }),
-      ...(data.gtin && { gtin: data.gtin }),
-      ...(data.default_origin_country && { default_origin_country: data.default_origin_country }),
+      ...(data.gtin !== undefined && { gtin: data.gtin }),
+      ...(data.default_origin_country !== undefined && { default_origin_country: data.default_origin_country }),
       ...(data.unit_type && { unit_type: data.unit_type }),
       standard_case_weight: data.standard_case_weight !== undefined ? data.standard_case_weight : undefined,
       variety: data.variety !== undefined ? data.variety : undefined,

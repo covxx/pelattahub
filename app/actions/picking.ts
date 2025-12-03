@@ -8,6 +8,92 @@ import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 import { OrderStatus, LotStatus } from "@prisma/client"
 
 /**
+ * Get orders ready for picking (CONFIRMED, PICKING, PARTIAL_PICK, READY_TO_SHIP)
+ */
+export async function getOrdersForPicking() {
+  noStore() // Ensure fresh data
+
+  const session = await auth()
+
+  if (!session?.user) {
+    throw new Error("Unauthorized")
+  }
+
+  // Only ADMIN and PACKER can view picking queue
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+    throw new Error("Insufficient permissions")
+  }
+
+  const orders = await prisma.order.findMany({
+    where: {
+      status: {
+        in: [
+          OrderStatus.CONFIRMED,
+          OrderStatus.PICKING,
+          OrderStatus.PARTIAL_PICK,
+          OrderStatus.READY_TO_SHIP,
+        ],
+      },
+    },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              unit_type: true,
+            },
+          },
+          picks: {
+            select: {
+              quantity_picked: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      delivery_date: "asc", // Oldest delivery date first
+    },
+  })
+
+  // Calculate picking progress for each order
+  const ordersWithProgress = orders.map((order) => {
+    const totalOrdered = order.items.reduce(
+      (sum, item) => sum + item.quantity_ordered,
+      0
+    )
+    const totalPicked = order.items.reduce((sum, item) => {
+      const itemPicked = item.picks.reduce(
+        (pickSum, pick) => pickSum + pick.quantity_picked,
+        0
+      )
+      return sum + itemPicked
+    }, 0)
+    const progressPercentage =
+      totalOrdered > 0 ? (totalPicked / totalOrdered) * 100 : 0
+
+    return {
+      ...order,
+      totalOrdered,
+      totalPicked,
+      progressPercentage,
+    }
+  })
+
+  return ordersWithProgress
+}
+
+/**
  * Get order with items and available inventory lots for picking
  * For each item, fetches available lots with remaining quantity calculated
  * (excluding picks from active orders)
@@ -101,10 +187,11 @@ export async function getOrderForPicking(orderId: string) {
     if (
       order.status !== OrderStatus.CONFIRMED &&
       order.status !== OrderStatus.PICKING &&
-      order.status !== OrderStatus.PARTIAL_PICK
+      order.status !== OrderStatus.PARTIAL_PICK &&
+      order.status !== OrderStatus.READY_TO_SHIP
     ) {
       throw new Error(
-        `Order is in ${order.status} status. Only CONFIRMED, PICKING, or PARTIAL_PICK orders can be picked.`
+        `Order is in ${order.status} status. Only CONFIRMED, PICKING, PARTIAL_PICK, or READY_TO_SHIP orders can be picked.`
       )
     }
 
@@ -181,28 +268,22 @@ export async function getOrderForPicking(orderId: string) {
             })
 
             // Calculate total picked quantity from active orders
-            const totalPicked = activePicks.reduce(
+            const totalPickedFromLot = activePicks.reduce(
               (sum, pick) => sum + pick.quantity_picked,
               0
             )
 
             // Calculate remaining quantity
-            const remaining_qty = Math.max(0, lot.quantity_current - totalPicked)
+            const remainingQty = lot.quantity_current - totalPickedFromLot
 
             return {
               ...lot,
-              remaining_qty,
-              total_picked: totalPicked,
+              remainingQty: Math.max(0, remainingQty), // Ensure non-negative
             }
           })
         )
 
-        // Filter out lots with zero remaining quantity
-        const lotsWithQty = lotsWithRemainingQty.filter(
-          (lot) => lot.remaining_qty > 0
-        )
-
-        // Calculate how much has been picked for this item
+        // Calculate how much has already been picked for this item
         const totalPickedForItem = item.picks.reduce(
           (sum, pick) => sum + pick.quantity_picked,
           0
@@ -211,7 +292,7 @@ export async function getOrderForPicking(orderId: string) {
 
         return {
           ...item,
-          availableLots: lotsWithQty,
+          availableLots: lotsWithRemainingQty,
           totalPicked: totalPickedForItem,
           remainingToPick,
         }
@@ -223,7 +304,7 @@ export async function getOrderForPicking(orderId: string) {
       items: itemsWithAvailableLots,
     }
   } catch (error) {
-    console.error("Error getting order for picking:", error)
+    console.error("Error fetching order for picking:", error)
     throw error
   }
 }
@@ -264,6 +345,11 @@ export async function submitPick(
               id: true,
               status: true,
               po_number: true,
+              customer: {
+                select: {
+                  name: true,
+                },
+              },
             },
           },
           product: {
@@ -290,7 +376,8 @@ export async function submitPick(
       if (
         orderItem.order.status !== OrderStatus.CONFIRMED &&
         orderItem.order.status !== OrderStatus.PICKING &&
-        orderItem.order.status !== OrderStatus.PARTIAL_PICK
+        orderItem.order.status !== OrderStatus.PARTIAL_PICK &&
+        orderItem.order.status !== OrderStatus.READY_TO_SHIP
       ) {
         throw new Error(
           `Order is in ${orderItem.order.status} status. Cannot pick from this order.`
@@ -357,7 +444,7 @@ export async function submitPick(
         )
       }
 
-      // Get all picks for this lot from active orders (not SHIPPED)
+      // Get all active picks for this lot (from non-shipped orders)
       const activePicks = await tx.orderPick.findMany({
         where: {
           inventory_lot_id: lotId,
@@ -397,26 +484,9 @@ export async function submitPick(
           quantity_picked: quantity,
           picked_by_user_id: session.user.id,
         },
-        include: {
-          order_item: {
-            include: {
-              order: {
-                select: {
-                  id: true,
-                  po_number: true,
-                },
-              },
-            },
-          },
-          inventory_lot: {
-            select: {
-              lot_number: true,
-            },
-          },
-        },
       })
 
-      // Decrement the lot's current quantity
+      // Decrement lot quantity
       const updatedLot = await tx.inventoryLot.update({
         where: { id: lotId },
         data: {
@@ -524,7 +594,6 @@ export async function submitPick(
           include: {
             customer: {
               select: {
-                id: true,
                 name: true,
               },
             },
@@ -533,53 +602,37 @@ export async function submitPick(
         product: {
           select: {
             name: true,
-            sku: true,
             unit_type: true,
           },
         },
       },
     })
 
-    const lot = await prisma.inventoryLot.findUnique({
-      where: { id: lotId },
-      select: {
-        lot_number: true,
-      },
-    })
-
-    if (orderItem && lot) {
-      // Ensure customer name is fetched correctly
-      const customerName = orderItem.order.customer?.name || "Unknown"
+    if (orderItem) {
+      const customerName = orderItem.order.customer.name || "Unknown"
       const poNumber = orderItem.order.po_number || null
 
       await logActivity(
         session.user.id,
         AuditAction.PICK,
-        EntityType.ORDER,
-        orderItem.order.id,
+        EntityType.LOT,
+        result.lot.id,
         {
-          summary: `Picked ${quantity} ${orderItem.product.unit_type.toLowerCase()} of ${orderItem.product.name} from Lot ${lot.lot_number} for Order #${poNumber || orderItem.order.id.slice(0, 8).toUpperCase()}`,
-          // Required fields for Lot History UI
+          summary: `Picked ${quantity} ${orderItem.product.unit_type?.toLowerCase() || "units"} of ${orderItem.product.name} from lot ${result.lot.lot_number} for order ${orderItem.order.po_number || orderItem.order.id.slice(0, 8)}`,
+          product_name: orderItem.product.name,
+          lot_number: result.lot.lot_number,
+          quantity: quantity,
+          unit_type: orderItem.product.unit_type,
           customer_name: customerName,
           po_number: poNumber,
-          quantity: quantity,
-          // Additional fields for context
-          order_item_id: orderItemId,
           order_id: orderItem.order.id,
-          order_po_number: poNumber, // Keep for backward compatibility
-          lot_id: lotId,
-          lot_number: lot.lot_number,
-          product_name: orderItem.product.name,
-          product_sku: orderItem.product.sku,
-          quantity_picked: quantity, // Keep for backward compatibility
-          unit_type: orderItem.product.unit_type,
-          order_status: result.orderStatus,
         }
       )
     }
 
+    revalidatePath(`/dashboard/orders/${orderItem?.order.id}/pick`)
     revalidatePath("/dashboard/orders")
-    revalidatePath(`/dashboard/orders/${orderItem?.order.id}`)
+    revalidatePath("/dashboard/picking")
 
     return {
       success: true,
@@ -597,8 +650,8 @@ export async function submitPick(
 }
 
 /**
- * Revert a pick - restore inventory and delete the pick record
- * Used to undo a pick that was made in error
+ * Revert a pick (unpick)
+ * Restores inventory and removes the pick record
  */
 export async function revertPick(pickId: string) {
   const session = await auth()
@@ -613,46 +666,39 @@ export async function revertPick(pickId: string) {
   }
 
   try {
-    // Use transaction to ensure all-or-nothing behavior
     const result = await prisma.$transaction(async (tx) => {
-      // Fetch the OrderPick record with relations
+      // Get the pick with related data
       const pick = await tx.orderPick.findUnique({
         where: { id: pickId },
         include: {
-          inventory_lot: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  sku: true,
-                  unit_type: true,
-                },
-              },
-            },
-          },
           order_item: {
             include: {
               order: {
                 select: {
                   id: true,
-                  po_number: true,
                   status: true,
+                  po_number: true,
+                  customer: {
+                    select: {
+                      name: true,
+                    },
+                  },
                 },
               },
               product: {
                 select: {
                   name: true,
-                  sku: true,
+                  unit_type: true,
                 },
               },
             },
           },
-          picked_by_user: {
+          inventory_lot: {
             select: {
               id: true,
-              name: true,
-              email: true,
+              lot_number: true,
+              quantity_current: true,
+              status: true,
             },
           },
         },
@@ -662,108 +708,149 @@ export async function revertPick(pickId: string) {
         throw new Error("Pick not found")
       }
 
-      // Check if order is already shipped - cannot revert picks from shipped orders
+      // Check if order is still pickable (not shipped)
       if (pick.order_item.order.status === OrderStatus.SHIPPED) {
-        throw new Error("Cannot revert picks from shipped orders")
+        throw new Error("Cannot revert pick from a shipped order")
       }
 
-      // Restore inventory: increment quantity_current
+      // Restore inventory
       const updatedLot = await tx.inventoryLot.update({
         where: { id: pick.inventory_lot_id },
         data: {
           quantity_current: {
             increment: pick.quantity_picked,
           },
-          // If lot was DEPLETED, change status back to AVAILABLE
-          status:
-            pick.inventory_lot.status === LotStatus.DEPLETED
-              ? LotStatus.AVAILABLE
-              : pick.inventory_lot.status,
         },
       })
 
-      // Create audit log entry
+      // If lot was DEPLETED, change status back to AVAILABLE
+      if (pick.inventory_lot.status === LotStatus.DEPLETED) {
+        await tx.inventoryLot.update({
+          where: { id: pick.inventory_lot_id },
+          data: {
+            status: LotStatus.AVAILABLE,
+          },
+        })
+      }
+
+      // Delete the pick record
+      await tx.orderPick.delete({
+        where: { id: pickId },
+      })
+
+      // Check if order needs status update
+      const allOrderItems = await tx.orderItem.findMany({
+        where: { order_id: pick.order_item.order.id },
+        include: {
+          picks: {
+            select: {
+              quantity_picked: true,
+            },
+          },
+        },
+      })
+
+      const allItemsFullyPicked = allOrderItems.every((item) => {
+        const totalPicked = item.picks.reduce(
+          (sum, pick) => sum + pick.quantity_picked,
+          0
+        )
+        return totalPicked >= item.quantity_ordered
+      })
+
+      const hasAnyPicks = allOrderItems.some((item) => item.picks.length > 0)
+
+      // Update order status if needed
+      let orderStatus = pick.order_item.order.status
+      if (!allItemsFullyPicked && pick.order_item.order.status === OrderStatus.READY_TO_SHIP) {
+        // If order was READY_TO_SHIP but no longer fully picked, revert to PARTIAL_PICK or PICKING
+        if (hasAnyPicks) {
+          orderStatus = OrderStatus.PARTIAL_PICK
+        } else {
+          orderStatus = OrderStatus.PICKING
+        }
+        await tx.order.update({
+          where: { id: pick.order_item.order.id },
+          data: {
+            status: orderStatus,
+          },
+        })
+      } else if (!hasAnyPicks && pick.order_item.order.status !== OrderStatus.CONFIRMED) {
+        // If no picks remain, revert to CONFIRMED
+        orderStatus = OrderStatus.CONFIRMED
+        await tx.order.update({
+          where: { id: pick.order_item.order.id },
+          data: {
+            status: OrderStatus.CONFIRMED,
+          },
+        })
+      }
+
+      return {
+        lot: updatedLot,
+        orderStatus,
+      }
+    })
+
+    // Log the unpick activity
+    const pick = await prisma.orderPick.findUnique({
+      where: { id: pickId },
+      include: {
+        order_item: {
+          include: {
+            order: {
+              include: {
+                customer: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+            product: {
+              select: {
+                name: true,
+                unit_type: true,
+              },
+            },
+          },
+        },
+        inventory_lot: {
+          select: {
+            lot_number: true,
+          },
+        },
+      },
+    })
+
+    if (pick) {
+      const customerName = pick.order_item.order.customer.name || "Unknown"
+      const poNumber = pick.order_item.order.po_number || null
+
       await logActivity(
         session.user.id,
         AuditAction.UNPICK,
         EntityType.LOT,
         pick.inventory_lot_id,
         {
-          order_id: pick.order_item.order.id,
-          order_po_number: pick.order_item.order.po_number,
-          quantity_restored: pick.quantity_picked,
+          summary: `Reverted pick of ${pick.quantity_picked} ${pick.order_item.product.unit_type?.toLowerCase() || "units"} of ${pick.order_item.product.name} from lot ${pick.inventory_lot.lot_number} for order ${pick.order_item.order.po_number || pick.order_item.order.id.slice(0, 8)}`,
+          product_name: pick.order_item.product.name,
           lot_number: pick.inventory_lot.lot_number,
-          product_name: pick.inventory_lot.product.name,
-          product_sku: pick.inventory_lot.product.sku,
-          unit_type: pick.inventory_lot.product.unit_type,
-          reason: "User Reverted Pick",
-          original_picked_by: pick.picked_by_user.name || pick.picked_by_user.email,
-          summary: `Reverted pick of ${pick.quantity_picked} ${pick.inventory_lot.product.unit_type.toLowerCase()} from Lot ${pick.inventory_lot.lot_number} for Order #${pick.order_item.order.po_number || pick.order_item.order.id.slice(0, 8).toUpperCase()}`,
+          quantity: pick.quantity_picked,
+          unit_type: pick.order_item.product.unit_type,
+          customer_name: customerName,
+          po_number: poNumber,
+          order_id: pick.order_item.order.id,
         }
       )
-
-      // Delete the OrderPick record
-      await tx.orderPick.delete({
-        where: { id: pickId },
-      })
-
-      // Check if order status needs to be updated
-      // If order was READY_TO_SHIP and we revert a pick, it should go back to PARTIAL_PICK or PICKING
-      let orderStatus = pick.order_item.order.status
-      if (pick.order_item.order.status === OrderStatus.READY_TO_SHIP) {
-        // Get all items for this order to check if still fully picked
-        const allOrderItems = await tx.orderItem.findMany({
-          where: { order_id: pick.order_item.order.id },
-          include: {
-            picks: {
-              select: {
-                quantity_picked: true,
-              },
-            },
-          },
-        })
-
-        const allItemsFullyPicked = allOrderItems.every((item) => {
-          const totalPicked = item.picks.reduce(
-            (sum, p) => sum + p.quantity_picked,
-            0
-          )
-          return totalPicked >= item.quantity_ordered
-        })
-
-        if (!allItemsFullyPicked) {
-          // Check if any picks exist
-          const hasAnyPicks = allOrderItems.some((item) => item.picks.length > 0)
-          orderStatus = hasAnyPicks
-            ? OrderStatus.PARTIAL_PICK
-            : OrderStatus.PICKING
-
-          await tx.order.update({
-            where: { id: pick.order_item.order.id },
-            data: {
-              status: orderStatus,
-            },
-          })
-        }
-      }
-
-      return {
-        pick,
-        lot: updatedLot,
-        orderStatus,
-      }
-    })
-
-    // Revalidate relevant paths
-    revalidatePath("/dashboard/orders")
-    revalidatePath("/dashboard/inventory")
-    if (result.pick.order_item.order.id) {
-      revalidatePath(`/dashboard/orders/${result.pick.order_item.order.id}/pick`)
     }
+
+    revalidatePath(`/dashboard/orders/${pick?.order_item.order.id}/pick`)
+    revalidatePath("/dashboard/orders")
+    revalidatePath("/dashboard/picking")
 
     return {
       success: true,
-      lot: result.lot,
       orderStatus: result.orderStatus,
     }
   } catch (error) {
@@ -775,3 +862,122 @@ export async function revertPick(pickId: string) {
   }
 }
 
+/**
+ * Finalize order (mark as shipped)
+ * Only works for orders in READY_TO_SHIP status
+ */
+export async function finalizeOrder(orderId: string) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  // Only ADMIN and PACKER can finalize orders
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+    return { success: false, error: "Insufficient permissions" }
+  }
+
+  try {
+    // Get the order with items and picks
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                name: true,
+                sku: true,
+              },
+            },
+            picks: {
+              select: {
+                quantity_picked: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!order) {
+      return { success: false, error: "Order not found" }
+    }
+
+    // Verify order is in READY_TO_SHIP status
+    if (order.status !== OrderStatus.READY_TO_SHIP) {
+      return {
+        success: false,
+        error: `Order must be READY_TO_SHIP to finalize. Current status: ${order.status}`,
+      }
+    }
+
+    // Verify all items are fully picked
+    const allItemsFullyPicked = order.items.every((item) => {
+      const totalPicked = item.picks.reduce(
+        (sum, pick) => sum + pick.quantity_picked,
+        0
+      )
+      return totalPicked >= item.quantity_ordered
+    })
+
+    if (!allItemsFullyPicked) {
+      return {
+        success: false,
+        error: "Not all items are fully picked. Cannot finalize order.",
+      }
+    }
+
+    // Update order status to SHIPPED
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.SHIPPED,
+      },
+      include: {
+        customer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    })
+
+    // Log the finalization
+    await logActivity(
+      session.user.id,
+      AuditAction.SHIP,
+      EntityType.ORDER,
+      orderId,
+      {
+        summary: `Finalized and shipped order ${order.po_number || order.id.slice(0, 8)} for ${updatedOrder.customer.name}`,
+        customer_name: updatedOrder.customer.name,
+        po_number: order.po_number,
+        order_id: orderId,
+      }
+    )
+
+    revalidatePath("/dashboard/orders")
+    revalidatePath("/dashboard/picking")
+    revalidatePath(`/dashboard/orders/${orderId}/pick`)
+
+    return {
+      success: true,
+      order: updatedOrder,
+    }
+  } catch (error) {
+    console.error("Error finalizing order:", error)
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to finalize order",
+    }
+  }
+}

@@ -54,9 +54,11 @@ export async function getSystemHealth(): Promise<SystemHealth> {
   // Prevent caching - health data must be real-time
   noStore()
 
+  // Capture start time before database check so we can calculate latency even on failure
+  const start = performance.now()
+
   try {
     // Database latency check
-    const start = performance.now()
     await prisma.$queryRaw`SELECT 1`
     const end = performance.now()
     const latency = end - start
@@ -136,15 +138,17 @@ export async function getSystemHealth(): Promise<SystemHealth> {
       })),
     }
   } catch (error) {
-    // If database check fails, system is degraded
-    const latency = performance.now() - performance.now() // 0 or use a fallback
+    // If database check fails, calculate latency from start time to failure
+    const end = performance.now()
+    const latency = end - start
+
     const memoryUsage = process.memoryUsage()
     const memoryMB = Math.round(memoryUsage.rss / (1024 * 1024))
     const uptime = formatUptime(process.uptime())
 
     return {
       status: "DEGRADED",
-      latency: 0,
+      latency: Math.round(latency * 100) / 100, // Round to 2 decimal places (same as success path)
       memoryMB,
       uptime,
       errorCount: 0,

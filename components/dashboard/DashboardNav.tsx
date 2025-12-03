@@ -48,7 +48,7 @@ const navigation = [
   },
   {
     name: "Picking",
-    href: "/dashboard/orders",
+    href: "/dashboard/picking",
     icon: Hand,
     roles: ["ADMIN", "PACKER"],
   },
