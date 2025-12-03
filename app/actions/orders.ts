@@ -17,6 +17,11 @@ interface CreateOrderInput {
 }
 
 /**
+ * NOTE: generateOrderNumber() function removed - using UUID instead
+ * Order identification now uses order.id (UUID) instead of order_number
+ */
+
+/**
  * Create a new order in DRAFT status
  */
 export async function createOrder(input: CreateOrderInput) {
@@ -52,9 +57,10 @@ export async function createOrder(input: CreateOrderInput) {
       return { success: false, error: "One or more products not found" }
     }
 
-    // Create order with items
+    // Create order with items (using UUID for now)
     const order = await prisma.order.create({
       data: {
+        // order_number: temporarily disabled, using UUID id instead
         customer_id: input.customerId,
         po_number: input.poNumber || null,
         delivery_date: input.deliveryDate,
@@ -91,7 +97,7 @@ export async function createOrder(input: CreateOrderInput) {
       EntityType.ORDER,
       order.id,
       {
-        summary: `Created order ${order.po_number || order.id.slice(0, 8)} for ${customer.name}`,
+        summary: `Created order ${order.id} for ${customer.name}`,
         customer_name: customer.name,
         item_count: input.items.length,
       }
@@ -270,7 +276,7 @@ export async function allocateOrder(orderId: string) {
       EntityType.ORDER,
       orderId,
       {
-        summary: `Allocated order ${order.po_number || order.id.slice(0, 8)} using FIFO`,
+        summary: `Allocated order ${order.id} using FIFO`,
         customer_name: order.customer.name,
         allocation_count: result.allocations.length,
       }
@@ -335,6 +341,22 @@ export async function getOrders(filters?: {
               id: true,
               name: true,
               sku: true,
+              unit_type: true,
+            },
+          },
+          picks: {
+            include: {
+              inventory_lot: {
+                select: {
+                  lot_number: true,
+                },
+              },
+              picked_by_user: {
+                select: {
+                  name: true,
+                  email: true,
+                },
+              },
             },
           },
           allocations: {
@@ -366,6 +388,165 @@ export async function getOrders(filters?: {
 }
 
 /**
+ * Update an existing order
+ * Only allows editing DRAFT orders
+ */
+export async function updateOrder(
+  orderId: string,
+  data: {
+    customerId?: string
+    poNumber?: string
+    deliveryDate?: Date
+    items?: Array<{
+      productId: string
+      quantity: number
+    }>
+  }
+) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  // Only ADMIN can update orders
+  if (session.user.role !== "ADMIN") {
+    return { success: false, error: "Admin access required" }
+  }
+
+  try {
+    // Get existing order
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: true,
+        customer: true,
+      },
+    })
+
+    if (!existingOrder) {
+      return { success: false, error: "Order not found" }
+    }
+
+    // Only allow editing DRAFT orders
+    if (existingOrder.status !== OrderStatus.DRAFT) {
+      return {
+        success: false,
+        error: `Cannot edit order in ${existingOrder.status} status. Only DRAFT orders can be edited.`,
+      }
+    }
+
+    // Verify customer if being updated
+    if (data.customerId) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: data.customerId },
+      })
+      if (!customer) {
+        return { success: false, error: "Customer not found" }
+      }
+    }
+
+    // Verify products if items are being updated
+    if (data.items) {
+      const productIds = data.items.map((item) => item.productId)
+      const products = await prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true },
+      })
+      if (products.length !== productIds.length) {
+        return { success: false, error: "One or more products not found" }
+      }
+    }
+
+    // Update order and items in a transaction
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // Update order fields
+      const order = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          ...(data.customerId && { customer_id: data.customerId }),
+          ...(data.poNumber !== undefined && { po_number: data.poNumber || null }),
+          ...(data.deliveryDate && { delivery_date: data.deliveryDate }),
+        },
+        include: {
+          customer: true,
+          items: true,
+        },
+      })
+
+      // Update items if provided
+      if (data.items) {
+        // Delete existing items
+        await tx.orderItem.deleteMany({
+          where: { order_id: orderId },
+        })
+
+        // Create new items
+        await tx.orderItem.createMany({
+          data: data.items.map((item) => ({
+            order_id: orderId,
+            product_id: item.productId,
+            quantity_ordered: item.quantity,
+          })),
+        })
+      }
+
+      // Fetch updated order with items
+      return await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          customer: true,
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  unit_type: true,
+                },
+              },
+            },
+          },
+        },
+      })
+    })
+
+    if (!updatedOrder) {
+      return { success: false, error: "Failed to update order" }
+    }
+
+    // Log activity
+    await logActivity(
+      session.user.id,
+      AuditAction.UPDATE,
+      EntityType.ORDER,
+      orderId,
+      {
+        summary: `Updated order ${updatedOrder.id}`,
+        customer_name: updatedOrder.customer.name,
+        changes: {
+          customer: data.customerId ? "updated" : undefined,
+          po_number: data.poNumber !== undefined ? "updated" : undefined,
+          delivery_date: data.deliveryDate ? "updated" : undefined,
+          items: data.items ? "updated" : undefined,
+        },
+      }
+    )
+
+    revalidatePath("/dashboard/orders")
+    revalidatePath(`/dashboard/orders/${orderId}/edit`)
+    return { success: true, order: updatedOrder }
+  } catch (error) {
+    console.error("Error updating order:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update order",
+    }
+  }
+}
+
+/**
  * Get a single order by ID
  */
 export async function getOrderById(orderId: string) {
@@ -387,6 +568,21 @@ export async function getOrderById(orderId: string) {
               name: true,
               sku: true,
               unit_type: true,
+            },
+          },
+          picks: {
+            include: {
+              inventory_lot: {
+                select: {
+                  lot_number: true,
+                },
+              },
+              picked_by_user: {
+                select: {
+                  name: true,
+                  email: true,
+                },
+              },
             },
           },
           allocations: {
@@ -418,19 +614,19 @@ export async function getOrderById(orderId: string) {
 }
 
 /**
- * Finalize and ship an order
- * Sets order status to SHIPPED and logs the activity
+ * Unship an order - revert from SHIPPED back to READY_TO_SHIP
+ * Restores inventory quantities and deletes pick records
  */
-export async function finalizeOrder(orderId: string) {
+export async function unshipOrder(orderId: string) {
   const session = await auth()
 
   if (!session?.user) {
     return { success: false, error: "Unauthorized" }
   }
 
-  // Only ADMIN and PACKER can finalize orders
-  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
-    return { success: false, error: "Insufficient permissions" }
+  // Only ADMIN can unship orders
+  if (session.user.role !== "ADMIN") {
+    return { success: false, error: "Admin access required" }
   }
 
   try {
@@ -440,7 +636,6 @@ export async function finalizeOrder(orderId: string) {
       include: {
         customer: {
           select: {
-            id: true,
             name: true,
           },
         },
@@ -450,11 +645,18 @@ export async function finalizeOrder(orderId: string) {
               select: {
                 name: true,
                 sku: true,
+                unit_type: true,
               },
             },
             picks: {
-              select: {
-                quantity_picked: true,
+              include: {
+                inventory_lot: {
+                  select: {
+                    id: true,
+                    lot_number: true,
+                    quantity_current: true,
+                  },
+                },
               },
             },
           },
@@ -466,72 +668,101 @@ export async function finalizeOrder(orderId: string) {
       return { success: false, error: "Order not found" }
     }
 
-    // Verify order is in READY_TO_SHIP status
-    if (order.status !== OrderStatus.READY_TO_SHIP) {
+    if (order.status !== OrderStatus.SHIPPED) {
       return {
         success: false,
-        error: `Order must be READY_TO_SHIP to finalize. Current status: ${order.status}`,
+        error: `Order must be SHIPPED to unship. Current status: ${order.status}`,
       }
     }
 
-    // Verify all items are fully picked
-    const allItemsFullyPicked = order.items.every((item) => {
-      const totalPicked = item.picks.reduce(
-        (sum, pick) => sum + pick.quantity_picked,
-        0
-      )
-      return totalPicked >= item.quantity_ordered
-    })
+    // Use transaction to ensure all-or-nothing
+    await prisma.$transaction(async (tx) => {
+      // Restore inventory quantities for all picked lots
+      for (const item of order.items) {
+        for (const pick of item.picks) {
+          // Increment the lot's current quantity
+          await tx.inventoryLot.update({
+            where: { id: pick.inventory_lot_id },
+            data: {
+              quantity_current: {
+                increment: pick.quantity_picked,
+              },
+            },
+          })
 
-    if (!allItemsFullyPicked) {
-      return {
-        success: false,
-        error: "Not all items are fully picked. Cannot finalize order.",
+          // Log the inventory restoration
+          await logActivity(
+            session.user.id,
+            AuditAction.UPDATE,
+            EntityType.LOT,
+            pick.inventory_lot_id,
+            {
+              summary: `Restored ${pick.quantity_picked} ${item.product.unit_type.toLowerCase()} to Lot ${pick.inventory_lot.lot_number} from unshipped order`,
+              lot_number: pick.inventory_lot.lot_number,
+              product_name: item.product.name,
+              product_sku: item.product.sku,
+              quantity_restored: pick.quantity_picked,
+              order_id: orderId,
+              order_po_number: order.po_number,
+            }
+          )
+        }
       }
-    }
 
-    // Update order status to SHIPPED
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: OrderStatus.SHIPPED,
-      },
-      include: {
-        customer: true,
-      },
+      // Delete all pick records
+      await tx.orderPick.deleteMany({
+        where: {
+          order_item: {
+            order_id: orderId,
+          },
+        },
+      })
+
+      // Update order status back to READY_TO_SHIP
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.READY_TO_SHIP,
+        },
+      })
     })
 
-    // Log the finalization activity
+    // Log the unship activity
     await logActivity(
       session.user.id,
-      AuditAction.SHIP,
+      AuditAction.UPDATE,
       EntityType.ORDER,
       orderId,
       {
-        summary: `Finalized and shipped order ${order.po_number || order.id.slice(0, 8)} for ${order.customer.name}`,
+        summary: `Unshipped order ${order.id} - restored inventory and reverted to READY_TO_SHIP`,
         customer_name: order.customer.name,
+        po_number: order.po_number,
         item_count: order.items.length,
-        total_items: order.items.length,
-        // TODO: Add packing slip generation here
-        packing_slip_generated: false, // Placeholder
+        picks_restored: order.items.reduce(
+          (sum, item) => sum + item.picks.length,
+          0
+        ),
       }
     )
 
     revalidatePath("/dashboard/orders")
-    revalidatePath(`/dashboard/orders/${orderId}`)
-
-    return {
-      success: true,
-      order: updatedOrder,
-      // TODO: Return packing slip URL when implemented
-      packingSlipUrl: null,
-    }
+    revalidatePath(`/dashboard/orders/${orderId}/pick`)
+    return { success: true }
   } catch (error) {
-    console.error("Error finalizing order:", error)
+    console.error("Error unshipping order:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to finalize order",
+      error:
+        error instanceof Error ? error.message : "Failed to unship order",
     }
   }
 }
+
+/**
+ * Finalize and ship an order
+ * NOTE: This function has been moved to app/actions/picking.ts to avoid naming conflicts.
+ * Use finalizeOrder from picking.ts instead.
+ * 
+ * @deprecated Use finalizeOrder from @/app/actions/picking instead
+ */
 

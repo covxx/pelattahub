@@ -19,8 +19,8 @@ export async function getOrdersForPicking() {
     throw new Error("Unauthorized")
   }
 
-  // Only ADMIN and PACKER can view picking queue
-  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+  // Only ADMIN, PACKER, and MANAGER can view picking queue
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER" && session.user.role !== "MANAGER") {
     throw new Error("Insufficient permissions")
   }
 
@@ -107,8 +107,8 @@ export async function getOrderForPicking(orderId: string) {
     throw new Error("Unauthorized")
   }
 
-  // Only ADMIN and PACKER can pick orders
-  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+  // Only ADMIN, PACKER, and MANAGER can pick orders
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER" && session.user.role !== "MANAGER") {
     throw new Error("Insufficient permissions")
   }
 
@@ -324,8 +324,8 @@ export async function submitPick(
     return { success: false, error: "Unauthorized" }
   }
 
-  // Only ADMIN and PACKER can pick orders
-  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+  // Only ADMIN, PACKER, and MANAGER can pick orders
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER" && session.user.role !== "MANAGER") {
     return { success: false, error: "Insufficient permissions" }
   }
 
@@ -344,6 +344,7 @@ export async function submitPick(
             select: {
               id: true,
               status: true,
+              order_number: true,
               po_number: true,
               customer: {
                 select: {
@@ -618,14 +619,14 @@ export async function submitPick(
         EntityType.LOT,
         result.lot.id,
         {
-          summary: `Picked ${quantity} ${orderItem.product.unit_type?.toLowerCase() || "units"} of ${orderItem.product.name} from lot ${result.lot.lot_number} for order ${orderItem.order.po_number || orderItem.order.id.slice(0, 8)}`,
+          summary: `Picked ${quantity} ${orderItem.product.unit_type?.toLowerCase() || "units"} of ${orderItem.product.name} from lot ${result.lot.lot_number} for order ${orderItem.order.id}`,
           product_name: orderItem.product.name,
           lot_number: result.lot.lot_number,
           quantity: quantity,
           unit_type: orderItem.product.unit_type,
           customer_name: customerName,
-          po_number: poNumber,
           order_id: orderItem.order.id,
+          po_number: poNumber,
         }
       )
     }
@@ -660,8 +661,8 @@ export async function revertPick(pickId: string) {
     return { success: false, error: "Unauthorized" }
   }
 
-  // Only ADMIN and PACKER can revert picks
-  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+  // Only ADMIN, PACKER, and MANAGER can revert picks
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER" && session.user.role !== "MANAGER") {
     return { success: false, error: "Insufficient permissions" }
   }
 
@@ -677,6 +678,7 @@ export async function revertPick(pickId: string) {
                 select: {
                   id: true,
                   status: true,
+                  order_number: true,
                   po_number: true,
                   customer: {
                     select: {
@@ -833,14 +835,14 @@ export async function revertPick(pickId: string) {
         EntityType.LOT,
         pick.inventory_lot_id,
         {
-          summary: `Reverted pick of ${pick.quantity_picked} ${pick.order_item.product.unit_type?.toLowerCase() || "units"} of ${pick.order_item.product.name} from lot ${pick.inventory_lot.lot_number} for order ${pick.order_item.order.po_number || pick.order_item.order.id.slice(0, 8)}`,
+          summary: `Reverted pick of ${pick.quantity_picked} ${pick.order_item.product.unit_type?.toLowerCase() || "units"} of ${pick.order_item.product.name} from lot ${pick.inventory_lot.lot_number} for order ${pick.order_item.order.id}`,
           product_name: pick.order_item.product.name,
           lot_number: pick.inventory_lot.lot_number,
           quantity: pick.quantity_picked,
           unit_type: pick.order_item.product.unit_type,
           customer_name: customerName,
-          po_number: poNumber,
           order_id: pick.order_item.order.id,
+          po_number: poNumber,
         }
       )
     }
@@ -873,8 +875,8 @@ export async function finalizeOrder(orderId: string) {
     return { success: false, error: "Unauthorized" }
   }
 
-  // Only ADMIN and PACKER can finalize orders
-  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+  // Only ADMIN, PACKER, and MANAGER can finalize orders
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER" && session.user.role !== "MANAGER") {
     return { success: false, error: "Insufficient permissions" }
   }
 
@@ -957,10 +959,10 @@ export async function finalizeOrder(orderId: string) {
       EntityType.ORDER,
       orderId,
       {
-        summary: `Finalized and shipped order ${order.po_number || order.id.slice(0, 8)} for ${updatedOrder.customer.name}`,
+        summary: `Finalized and shipped order ${order.id} for ${updatedOrder.customer.name}`,
         customer_name: updatedOrder.customer.name,
         po_number: order.po_number,
-        order_id: orderId,
+        order_id: order.id,
       }
     )
 

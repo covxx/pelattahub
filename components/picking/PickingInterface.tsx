@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { CheckCircle2, Package, Truck } from "lucide-react"
 import { PickItemCard } from "./PickItemCard"
 import { LotSelectorSheet } from "./LotSelectorSheet"
-import { finalizeOrder } from "@/app/actions/orders"
+import { finalizeOrder } from "@/app/actions/picking"
 import { useToast } from "@/hooks/useToast"
 import { format } from "date-fns"
 
@@ -104,7 +104,7 @@ export function PickingInterface({ order: initialOrder }: PickingInterfaceProps)
       <div className="space-y-4">
         <div>
           <h1 className="text-3xl font-bold">
-            Picking Order #{order.po_number || order.id.slice(0, 8).toUpperCase()}
+            Picking Order {order.order_number || order.id.slice(0, 8)}
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
             {order.customer.name}
