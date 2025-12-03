@@ -15,6 +15,44 @@ The system currently supports:
 
 ## 📋 Upcoming Features
 
+### 🔢 Sequential Order Numbering System
+
+**Priority:** Medium  
+**Status:** Planned (Currently using UUIDs)
+
+**Goal:** Implement a user-friendly sequential order numbering system starting from 100001.
+
+**Current Status:**
+- Order model includes optional `order_number` field
+- Migration created to add `order_number` column
+- Currently using UUIDs for order identification due to implementation challenges
+
+**Challenges Encountered:**
+- Prisma client synchronization issues in Docker environment
+- Null constraint violations during order creation
+- Transaction atomicity concerns for sequential number generation
+
+**Planned Implementation:**
+- Generate sequential order numbers atomically within transactions
+- Start numbering from 100001 (or configurable starting point)
+- Ensure thread-safe number generation for concurrent order creation
+- Fallback to UUID if sequential generation fails
+- Display order numbers prominently in UI (with UUID fallback)
+
+**Technical Requirements:**
+- Database sequence or atomic counter for number generation
+- Proper Prisma client regeneration in Docker build process
+- Transaction-based number allocation to prevent duplicates
+- Migration strategy for existing orders
+
+**Expected Outcome:**
+- Human-readable order numbers (e.g., "100001", "100002")
+- Better user experience for order identification
+- Easier order reference in customer communications
+- Maintains backward compatibility with UUID system
+
+---
+
 ### 🏷️ Print UX Polish
 
 **Priority:** High  
