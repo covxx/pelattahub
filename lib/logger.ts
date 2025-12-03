@@ -53,6 +53,11 @@ export const AuditAction = {
   ADJUST_QUANTITY: "ADJUST_QUANTITY",
   ADJUST_QTY: "ADJUST_QTY", // Alias for consistency
   
+  // Picking
+  PICK: "PICK",
+  UNPICK: "UNPICK",
+  SHIP: "SHIP",
+  
   // Access
   LOGIN: "LOGIN",
   LOGOUT: "LOGOUT",

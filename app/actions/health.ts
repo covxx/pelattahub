@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { logActivity } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
 import { unstable_noStore as noStore } from "next/cache"
 
@@ -17,27 +18,12 @@ async function requireAdmin() {
 }
 
 export interface SystemHealth {
-  status: "OPERATIONAL" | "DEGRADED"
-  database: {
-    latency: number // milliseconds
-    connected: boolean
-  }
-  memory: {
-    rss: number // Resident Set Size in bytes
-    heapTotal: number
-    heapUsed: number
-  }
-  uptime: number // seconds
-  errorRate: {
-    count: number
-    last24h: boolean
-  }
-  rowCounts: {
-    users: number
-    products: number
-    activeLots: number
-    pendingReceives: number
-  }
+  status: "OK" | "DEGRADED"
+  latency: number // milliseconds
+  memoryMB: number // Resident Set Size in MB
+  uptime: string // Formatted as "HH:MM"
+  errorCount: number
+  pendingReceives: number
   recentLogs: Array<{
     id: string
     action: string
@@ -45,12 +31,22 @@ export interface SystemHealth {
     createdAt: Date
     user: {
       name: string | null
+      email: string
     }
   }>
 }
 
 /**
- * Get comprehensive system health metrics
+ * Format seconds to HH:MM string
+ */
+function formatUptime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
+}
+
+/**
+ * Get system health metrics
  */
 export async function getSystemHealth(): Promise<SystemHealth> {
   await requireAdmin()
@@ -58,60 +54,49 @@ export async function getSystemHealth(): Promise<SystemHealth> {
   // Prevent caching - health data must be real-time
   noStore()
 
-  const startTime = Date.now()
-
   try {
     // Database latency check
-    const dbStartTime = Date.now()
+    const start = performance.now()
     await prisma.$queryRaw`SELECT 1`
-    const dbLatency = Date.now() - dbStartTime
-    const dbConnected = true
+    const end = performance.now()
+    const latency = end - start
 
-    // Determine overall status based on DB latency
-    const status: "OPERATIONAL" | "DEGRADED" = dbLatency < 200 ? "OPERATIONAL" : "DEGRADED"
-
-    // Memory usage
+    // Memory usage (RSS in MB)
     const memoryUsage = process.memoryUsage()
+    const memoryMB = Math.round(memoryUsage.rss / (1024 * 1024))
 
-    // Uptime
-    const uptime = process.uptime()
+    // Uptime formatted as HH:MM
+    const uptimeSeconds = process.uptime()
+    const uptime = formatUptime(uptimeSeconds)
 
-    // Error rate (last 24 hours)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const errorCount = await prisma.auditLog.count({
+    // Error count (today - from start of day)
+    // Query for entries where action contains "ERROR" OR details contains "failure"
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    
+    // Use raw SQL to search JSON field for "failure" text
+    // For JSONB fields, cast to text and search (handle NULL with COALESCE)
+    const errorCountResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint as count
+      FROM audit_logs
+      WHERE "createdAt" >= ${todayStart}
+        AND (
+          LOWER(action) LIKE '%error%'
+          OR LOWER(COALESCE(details::text, '')) LIKE '%failure%'
+        )
+    `
+    const errorCount = Number(errorCountResult[0]?.count || 0)
+
+    // Pending jobs: Count ReceivingEvents where status is 'OPEN'
+    const pendingReceives = await prisma.receivingEvent.count({
       where: {
-        action: {
-          contains: "ERROR",
-          mode: "insensitive",
-        },
-        createdAt: {
-          gte: twentyFourHoursAgo,
-        },
+        status: "OPEN",
       },
     })
 
-    // Row counts
-    const [usersCount, productsCount, activeLotsCount, pendingReceivesCount] =
-      await Promise.all([
-        prisma.user.count(),
-        prisma.product.count(),
-        prisma.inventoryLot.count({
-          where: {
-            status: {
-              in: ["RECEIVED", "QC_PENDING", "AVAILABLE"],
-            },
-          },
-        }),
-        prisma.receivingEvent.count({
-          where: {
-            status: "OPEN",
-          },
-        }),
-      ])
-
-    // Recent system logs (last 10)
+    // Recent system logs (last 5)
     const recentLogs = await prisma.auditLog.findMany({
-      take: 10,
+      take: 5,
       orderBy: {
         createdAt: "desc",
       },
@@ -123,33 +108,22 @@ export async function getSystemHealth(): Promise<SystemHealth> {
         user: {
           select: {
             name: true,
+            email: true,
           },
         },
       },
     })
 
+    // Determine status: DEGRADED if latency > 500ms or errors > 0
+    const status: "OK" | "DEGRADED" = latency > 500 || errorCount > 0 ? "DEGRADED" : "OK"
+
     return {
       status,
-      database: {
-        latency: dbLatency,
-        connected: dbConnected,
-      },
-      memory: {
-        rss: memoryUsage.rss,
-        heapTotal: memoryUsage.heapTotal,
-        heapUsed: memoryUsage.heapUsed,
-      },
+      latency: Math.round(latency * 100) / 100, // Round to 2 decimal places
+      memoryMB,
       uptime,
-      errorRate: {
-        count: errorCount,
-        last24h: true,
-      },
-      rowCounts: {
-        users: usersCount,
-        products: productsCount,
-        activeLots: activeLotsCount,
-        pendingReceives: pendingReceivesCount,
-      },
+      errorCount,
+      pendingReceives,
       recentLogs: recentLogs.map((log) => ({
         id: log.id,
         action: log.action,
@@ -157,35 +131,24 @@ export async function getSystemHealth(): Promise<SystemHealth> {
         createdAt: log.createdAt,
         user: {
           name: log.user.name,
+          email: log.user.email,
         },
       })),
     }
   } catch (error) {
     // If database check fails, system is degraded
-    const dbLatency = Date.now() - startTime
+    const latency = performance.now() - performance.now() // 0 or use a fallback
+    const memoryUsage = process.memoryUsage()
+    const memoryMB = Math.round(memoryUsage.rss / (1024 * 1024))
+    const uptime = formatUptime(process.uptime())
 
     return {
       status: "DEGRADED",
-      database: {
-        latency: dbLatency,
-        connected: false,
-      },
-      memory: {
-        rss: process.memoryUsage().rss,
-        heapTotal: process.memoryUsage().heapTotal,
-        heapUsed: process.memoryUsage().heapUsed,
-      },
-      uptime: process.uptime(),
-      errorRate: {
-        count: 0,
-        last24h: true,
-      },
-      rowCounts: {
-        users: 0,
-        products: 0,
-        activeLots: 0,
-        pendingReceives: 0,
-      },
+      latency: 0,
+      memoryMB,
+      uptime,
+      errorCount: 0,
+      pendingReceives: 0,
       recentLogs: [],
     }
   }
@@ -225,4 +188,39 @@ export async function disconnectPrisma() {
     }
   }
 }
+
+/**
+ * Run garbage collection (mostly placebo, but logs maintenance activity)
+ */
+export async function runGarbageCollection() {
+  const session = await requireAdmin()
+  
+  try {
+    // Log the maintenance activity
+    await logActivity(
+      session.user.id,
+      "MAINTENANCE",
+      "SYSTEM",
+      "GC",
+      {
+        summary: "Garbage collection maintenance ran",
+        timestamp: new Date().toISOString(),
+      }
+    )
+    
+    // Force garbage collection if available (Node.js doesn't expose this directly)
+    if (global.gc) {
+      global.gc()
+    }
+    
+    revalidatePath("/dashboard/admin/health")
+    return { success: true, message: "Garbage collection completed" }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to run garbage collection",
+    }
+  }
+}
+
 

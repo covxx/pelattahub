@@ -29,13 +29,13 @@ export function FlashConfirmation({
         // Ignore audio errors
       }
 
-      // Auto-hide after 1.5 seconds
+      // Auto-hide after 0.8 seconds (shorter for better UX)
       const timer = setTimeout(() => {
         setIsVisible(false)
         if (onComplete) {
-          setTimeout(onComplete, 300) // Wait for fade out animation
+          setTimeout(onComplete, 200) // Wait for fade out animation
         }
-      }, 1500)
+      }, 800)
 
       return () => clearTimeout(timer)
     }

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Printer, FileText, ArrowLeft } from "lucide-react"
-import { finalizeReceivingEvent } from "@/app/actions/receiving"
+import { Input } from "@/components/ui/input"
+import { Printer, FileText, ArrowLeft, Edit2, Check, X } from "lucide-react"
+import { finalizeReceivingEvent, updateLotQuantity } from "@/app/actions/receiving"
 import { getCompanySettings } from "@/app/actions/settings"
 import { generateMasterLabel, generatePTILabel } from "@/lib/zpl-generator"
 import { printZplViaBrowser } from "@/lib/print-service"
@@ -28,6 +29,9 @@ export function ReceivingEventDetail({
   const [isEditMode, setIsEditMode] = useState(false)
   const [companySettings, setCompanySettings] = useState<any>(null)
   const [showPDFModal, setShowPDFModal] = useState(false)
+  const [editingLotId, setEditingLotId] = useState<string | null>(null)
+  const [editQuantity, setEditQuantity] = useState<number>(0)
+  const [isSaving, setIsSaving] = useState(false)
   const { toast, toasts, removeToast } = useToast()
 
   // Fetch company settings on mount
@@ -109,6 +113,42 @@ export function ReceivingEventDetail({
 
   const isOpen = event.status === "OPEN"
   const canEdit = isOpen && (userRole === "ADMIN" || userRole === "RECEIVER")
+
+  const handleStartEdit = (lot: any) => {
+    setEditingLotId(lot.id)
+    setEditQuantity(lot.original_quantity)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingLotId(null)
+    setEditQuantity(0)
+  }
+
+  const handleSaveEdit = async (lotId: string) => {
+    if (editQuantity <= 0) {
+      toast("Quantity must be greater than 0", "error")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const result = await updateLotQuantity(lotId, editQuantity)
+      if (result.success) {
+        toast("Quantity updated successfully", "success")
+        setEditingLotId(null)
+        router.refresh()
+      } else {
+        toast(result.error || "Failed to update quantity", "error")
+      }
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : "Failed to update quantity",
+        "error"
+      )
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -216,7 +256,19 @@ export function ReceivingEventDetail({
       {/* Lots Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Items Received</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Items Received</CardTitle>
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditMode(!isEditMode)}
+              >
+                <Edit2 className="h-4 w-4 mr-2" />
+                {isEditMode ? "Done Editing" : "Edit Quantities"}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <table className="w-full">
@@ -228,6 +280,7 @@ export function ReceivingEventDetail({
                 <th className="text-right py-2">Quantity</th>
                 <th className="text-left py-2">Unit</th>
                 <th className="text-right py-2">Current</th>
+                {canEdit && isEditMode && <th className="text-center py-2">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -236,9 +289,57 @@ export function ReceivingEventDetail({
                   <td className="font-mono text-sm py-3">{lot.lot_number}</td>
                   <td className="py-3">{lot.product.name}</td>
                   <td className="font-mono text-sm py-3">{lot.product.sku}</td>
-                  <td className="text-right py-3">{lot.original_quantity}</td>
+                  <td className="text-right py-3">
+                    {editingLotId === lot.id ? (
+                      <Input
+                        type="number"
+                        min="1"
+                        value={editQuantity}
+                        onChange={(e) =>
+                          setEditQuantity(parseInt(e.target.value) || 0)
+                        }
+                        className="w-24 text-right"
+                        disabled={isSaving}
+                      />
+                    ) : (
+                      lot.original_quantity
+                    )}
+                  </td>
                   <td className="py-3">{lot.product.unit_type}</td>
                   <td className="text-right py-3">{lot.quantity_current}</td>
+                  {canEdit && isEditMode && (
+                    <td className="text-center py-3">
+                      {editingLotId === lot.id ? (
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleSaveEdit(lot.id)}
+                            disabled={isSaving}
+                          >
+                            <Check className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleCancelEdit}
+                            disabled={isSaving}
+                          >
+                            <X className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleStartEdit(lot)}
+                          disabled={isSaving}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -246,7 +347,7 @@ export function ReceivingEventDetail({
               <tr className="font-bold">
                 <td colSpan={3} className="py-3">Total Items:</td>
                 <td className="text-right py-3">{event.lots.length}</td>
-                <td colSpan={2}></td>
+                <td colSpan={canEdit && isEditMode ? 3 : 2}></td>
               </tr>
             </tfoot>
           </table>

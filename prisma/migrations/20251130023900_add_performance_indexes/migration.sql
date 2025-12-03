@@ -8,3 +8,4 @@ CREATE INDEX IF NOT EXISTS "inventory_lots_lot_number_idx" ON "inventory_lots"("
 -- Note: Other indexes (product_id, receiving_event_id, status, received_date, expiry_date) already exist
 -- Note: AuditLog indexes (entity_id, createdAt) already exist
 
+

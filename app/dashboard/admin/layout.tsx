@@ -53,6 +53,9 @@ export default async function AdminLayout({
           <AdminNavLink href="/dashboard/admin/traceability">
             🔍 Traceability
           </AdminNavLink>
+          <AdminNavLink href="/dashboard/admin/health">
+            💚 System Health
+          </AdminNavLink>
           <AdminNavLink href="/dashboard/admin/settings">
             ⚙️ Settings
           </AdminNavLink>

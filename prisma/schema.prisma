@@ -44,6 +44,8 @@ enum OrderStatus {
   DRAFT
   CONFIRMED
   PICKING
+  PARTIAL_PICK
+  READY_TO_SHIP
   SHIPPED
 }
 
@@ -65,6 +67,7 @@ model User {
   receivingEvents  ReceivingEvent[]
   auditLogs        AuditLog[]
   orders           Order[]
+  orderPicks       OrderPick[]
   
   @@map("users")
 }
@@ -251,6 +254,7 @@ model InventoryLot {
   
   // Relations
   allocations      OrderAllocation[]
+  picks            OrderPick[]
   
   @@index([product_id])
   @@index([lot_number])
@@ -295,6 +299,7 @@ model OrderItem {
   
   // Relations
   allocations     OrderAllocation[]
+  picks           OrderPick[]
   
   @@index([order_id])
   @@index([product_id])
@@ -316,6 +321,27 @@ model OrderAllocation {
   @@index([order_item_id])
   @@index([inventory_lot_id])
   @@map("order_allocations")
+}
+
+// Order Pick Model - Tracks physical picking of inventory for orders
+model OrderPick {
+  id                String        @id @default(uuid()) @db.Uuid
+  order_item_id     String        @db.Uuid
+  order_item        OrderItem     @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
+  inventory_lot_id  String        @db.Uuid
+  inventory_lot     InventoryLot  @relation(fields: [inventory_lot_id], references: [id], onDelete: Restrict)
+  quantity_picked   Float         // Can be Int or Float depending on unit type (CASE, LBS, EACH)
+  picked_at         DateTime      @default(now())
+  picked_by_user_id String
+  picked_by_user    User          @relation(fields: [picked_by_user_id], references: [id], onDelete: Restrict)
+  
+  createdAt         DateTime      @default(now())
+  
+  @@index([order_item_id])
+  @@index([inventory_lot_id])
+  @@index([picked_by_user_id])
+  @@index([picked_at])
+  @@map("order_picks")
 }
 
 // Integration Settings Model - Stores OAuth tokens and integration config

@@ -12,6 +12,8 @@ import {
   AlertCircle,
   Clock,
   User,
+  Package,
+  RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -245,6 +247,38 @@ function getEventDetails(event: AuditLog): {
         description: details?.summary || "Lot deleted",
       }
 
+    case "PICK":
+      // Extract order info from details - use simplified field names
+      const orderPo = details?.po_number || 
+        details?.order_po_number || 
+        (details?.summary?.match(/Order #([A-Z0-9]+)/)?.[1]) || 
+        "Unknown"
+      const customerName = details?.customer_name || "Unknown Customer"
+      const qtyPicked = details?.quantity || details?.quantity_picked || 0
+      const unitType = details?.unit_type?.toLowerCase() || "units"
+      
+      return {
+        icon: <Package className="h-4 w-4 text-white" />,
+        color: "bg-indigo-500",
+        title: "Picked for Order",
+        description: `Picked ${qtyPicked} ${unitType} for Order #${orderPo} (${customerName})`,
+      }
+
+    case "UNPICK":
+      // Extract order info from details
+      const unpickOrderPo = details?.order_po_number || 
+        (details?.summary?.match(/Order #([A-Z0-9]+)/)?.[1]) || 
+        "Unknown"
+      const qtyRestored = details?.quantity_restored || 0
+      const unpickUnitType = details?.unit_type?.toLowerCase() || "units"
+      
+      return {
+        icon: <RotateCcw className="h-4 w-4 text-white" />,
+        color: "bg-orange-500",
+        title: "Returned to Stock",
+        description: `Returned ${qtyRestored} ${unpickUnitType} from Order #${unpickOrderPo} to Stock`,
+      }
+
     default:
       return {
         icon: <Clock className="h-4 w-4 text-white" />,
@@ -256,8 +290,8 @@ function getEventDetails(event: AuditLog): {
 }
 
 function shouldShowDetails(event: AuditLog): boolean {
-  // Show details for adjustments, updates, and receives
-  return ["ADJUST_QTY", "ADJUST_QUANTITY", "UPDATE", "RECEIVE"].includes(
+  // Show details for adjustments, updates, receives, picks, and unpicks
+  return ["ADJUST_QTY", "ADJUST_QUANTITY", "UPDATE", "RECEIVE", "PICK", "UNPICK"].includes(
     event.action
   )
 }
@@ -343,6 +377,88 @@ function renderEventDetails(event: AuditLog) {
                 </span>
               </div>
             )}
+        </>
+      )
+
+    case "PICK":
+      return (
+        <>
+          {details.product_name && (
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600 dark:text-gray-400">
+                Product:
+              </span>
+              <span className="text-gray-900 dark:text-white">
+                {details.product_name}
+              </span>
+            </div>
+          )}
+          {(details.po_number || details.order_po_number) && (
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600 dark:text-gray-400">
+                Order PO:
+              </span>
+              <span className="text-gray-900 dark:text-white">
+                {details.po_number || details.order_po_number}
+              </span>
+            </div>
+          )}
+          {details.customer_name && (
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600 dark:text-gray-400">
+                Customer:
+              </span>
+              <span className="text-gray-900 dark:text-white">
+                {details.customer_name}
+              </span>
+            </div>
+          )}
+          {(details.quantity || details.quantity_picked) && (
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600 dark:text-gray-400">
+                Quantity:
+              </span>
+              <span className="text-gray-900 dark:text-white">
+                {details.quantity || details.quantity_picked} {details.unit_type?.toLowerCase() || "units"}
+              </span>
+            </div>
+          )}
+        </>
+      )
+
+    case "UNPICK":
+      return (
+        <>
+          {details.product_name && (
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600 dark:text-gray-400">
+                Product:
+              </span>
+              <span className="text-gray-900 dark:text-white">
+                {details.product_name}
+              </span>
+            </div>
+          )}
+          {details.order_po_number && (
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600 dark:text-gray-400">
+                Order PO:
+              </span>
+              <span className="text-gray-900 dark:text-white">
+                {details.order_po_number}
+              </span>
+            </div>
+          )}
+          {details.reason && (
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600 dark:text-gray-400">
+                Reason:
+              </span>
+              <span className="text-gray-900 dark:text-white">
+                {details.reason}
+              </span>
+            </div>
+          )}
         </>
       )
 

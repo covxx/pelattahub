@@ -1,5 +1,9 @@
--- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('DRAFT', 'CONFIRMED', 'PICKING', 'SHIPPED');
+-- CreateEnum (only if it doesn't exist)
+DO $$ BEGIN
+    CREATE TYPE "OrderStatus" AS ENUM ('DRAFT', 'CONFIRMED', 'PICKING', 'SHIPPED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- CreateTable
 CREATE TABLE "orders" (
@@ -80,4 +84,5 @@ ALTER TABLE "order_allocations" ADD CONSTRAINT "order_allocations_order_item_id_
 
 -- AddForeignKey
 ALTER TABLE "order_allocations" ADD CONSTRAINT "order_allocations_inventory_lot_id_fkey" FOREIGN KEY ("inventory_lot_id") REFERENCES "inventory_lots"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
 

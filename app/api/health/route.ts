@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", timestamp: new Date().toISOString() })
+  try {
+    // Try to connect to Prisma
+    await prisma.$queryRaw`SELECT 1`
+    
+    // If successful, return ok status
+    return NextResponse.json({ status: "ok" }, { status: 200 })
+  } catch (error) {
+    // If connection fails, return error status
+    return NextResponse.json({ status: "error" }, { status: 500 })
+  }
 }
 

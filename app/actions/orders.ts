@@ -417,3 +417,121 @@ export async function getOrderById(orderId: string) {
   return order
 }
 
+/**
+ * Finalize and ship an order
+ * Sets order status to SHIPPED and logs the activity
+ */
+export async function finalizeOrder(orderId: string) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  // Only ADMIN and PACKER can finalize orders
+  if (session.user.role !== "ADMIN" && session.user.role !== "PACKER") {
+    return { success: false, error: "Insufficient permissions" }
+  }
+
+  try {
+    // Get the order with items and picks
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                name: true,
+                sku: true,
+              },
+            },
+            picks: {
+              select: {
+                quantity_picked: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!order) {
+      return { success: false, error: "Order not found" }
+    }
+
+    // Verify order is in READY_TO_SHIP status
+    if (order.status !== OrderStatus.READY_TO_SHIP) {
+      return {
+        success: false,
+        error: `Order must be READY_TO_SHIP to finalize. Current status: ${order.status}`,
+      }
+    }
+
+    // Verify all items are fully picked
+    const allItemsFullyPicked = order.items.every((item) => {
+      const totalPicked = item.picks.reduce(
+        (sum, pick) => sum + pick.quantity_picked,
+        0
+      )
+      return totalPicked >= item.quantity_ordered
+    })
+
+    if (!allItemsFullyPicked) {
+      return {
+        success: false,
+        error: "Not all items are fully picked. Cannot finalize order.",
+      }
+    }
+
+    // Update order status to SHIPPED
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.SHIPPED,
+      },
+      include: {
+        customer: true,
+      },
+    })
+
+    // Log the finalization activity
+    await logActivity(
+      session.user.id,
+      AuditAction.SHIP,
+      EntityType.ORDER,
+      orderId,
+      {
+        summary: `Finalized and shipped order ${order.po_number || order.id.slice(0, 8)} for ${order.customer.name}`,
+        customer_name: order.customer.name,
+        item_count: order.items.length,
+        total_items: order.items.length,
+        // TODO: Add packing slip generation here
+        packing_slip_generated: false, // Placeholder
+      }
+    )
+
+    revalidatePath("/dashboard/orders")
+    revalidatePath(`/dashboard/orders/${orderId}`)
+
+    return {
+      success: true,
+      order: updatedOrder,
+      // TODO: Return packing slip URL when implemented
+      packingSlipUrl: null,
+    }
+  } catch (error) {
+    console.error("Error finalizing order:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to finalize order",
+    }
+  }
+}
+

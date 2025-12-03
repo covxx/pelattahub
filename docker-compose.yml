@@ -41,7 +41,7 @@ services:
           sleep 1
         done &&
         echo 'PostgreSQL is ready!' &&
-        npm install &&
+        npm ci --legacy-peer-deps &&
         npx prisma generate &&
         npx prisma migrate deploy &&
         echo 'Migrations completed successfully!'
@@ -71,16 +71,15 @@ services:
       NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-1234 Produce Lane, Salinas, CA}
       NODE_ENV: production
     depends_on:
-      prisma-migrate:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     networks:
       - wms-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
 
 networks:
   wms-network:

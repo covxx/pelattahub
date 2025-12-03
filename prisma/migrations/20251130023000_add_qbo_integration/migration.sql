@@ -25,3 +25,4 @@ CREATE TABLE "integration_settings" (
 
 CREATE UNIQUE INDEX "integration_settings_provider_key" ON "integration_settings"("provider");
 
+

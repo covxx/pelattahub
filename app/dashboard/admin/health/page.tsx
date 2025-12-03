@@ -3,6 +3,10 @@ import { redirect } from "next/navigation"
 import { SystemHealthDashboard } from "@/components/admin/SystemHealthDashboard"
 import { getSystemHealth } from "@/app/actions/health"
 
+// Force dynamic rendering to prevent caching
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function SystemHealthPage() {
   const session = await auth()
 
@@ -17,10 +21,7 @@ export default async function SystemHealthPage() {
   // Fetch health data
   const health = await getSystemHealth()
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
-      <SystemHealthDashboard initialHealth={health} />
-    </div>
-  )
+  return <SystemHealthDashboard initialHealth={health} />
 }
+
 

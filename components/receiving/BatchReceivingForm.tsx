@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useToast } from "@/hooks/useToast"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Plus, X, Printer, FileText, ChevronDown, Package, Weight } from "lucide-react"
+import { Plus, X, Printer, FileText, ChevronDown, Package, Weight, History } from "lucide-react"
+import { useRouter } from "next/navigation"
 import {
   Popover,
   PopoverContent,
@@ -144,6 +145,7 @@ export function BatchReceivingForm({
   vendors,
   topVendors,
 }: BatchReceivingFormProps) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [receivingEvent, setReceivingEvent] = useState<any | null>(null)
@@ -212,12 +214,12 @@ export function BatchReceivingForm({
           // Show flash confirmation
           setShowFlash(true)
           
-          // After flash completes, show receipt
+          // After flash completes, show receipt (reduced from 1800ms to 1000ms)
           setTimeout(() => {
             setReceivingEvent(result.receivingEvent)
             setButtonState("normal")
             setShowFlash(false)
-          }, 1800)
+          }, 1000)
         } else {
           setError(result.error || "Failed to process receiving")
           setButtonState("normal")
@@ -375,6 +377,13 @@ export function BatchReceivingForm({
             <Button variant="outline" onClick={handleNewReceiving}>
               New Receiving
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/dashboard/receiving/history")}
+            >
+              <History className="h-4 w-4 mr-2" />
+              View History
+            </Button>
             <Button variant="outline" onClick={handlePrintReceipt}>
               <FileText className="h-4 w-4 mr-2" />
               Print Receipt
@@ -466,6 +475,16 @@ export function BatchReceivingForm({
     <Card>
       <CardHeader>
         <CardTitle>Batch Receiving</CardTitle>
+        <CardAction>
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => router.push("/dashboard/receiving/history")}
+          >
+            <History className="h-4 w-4 mr-2" />
+            View Receiving History
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent>
         <Form {...form}>
