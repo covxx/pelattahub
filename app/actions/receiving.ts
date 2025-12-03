@@ -24,7 +24,7 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
     throw new Error("Unauthorized")
   }
 
-  if (session.user.role !== "ADMIN" && session.user.role !== "RECEIVER") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "RECEIVER" && session.user.role !== "MANAGER") {
     throw new Error("Insufficient permissions")
   }
 
@@ -299,7 +299,7 @@ export async function updateLotQuantity(
     throw new Error("Unauthorized")
   }
 
-  if (session.user.role !== "ADMIN" && session.user.role !== "RECEIVER") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "RECEIVER" && session.user.role !== "MANAGER") {
     throw new Error("Insufficient permissions")
   }
 
@@ -369,7 +369,7 @@ export async function deleteLot(lotId: string) {
     throw new Error("Unauthorized")
   }
 
-  if (session.user.role !== "ADMIN" && session.user.role !== "RECEIVER") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "RECEIVER" && session.user.role !== "MANAGER") {
     throw new Error("Insufficient permissions")
   }
 

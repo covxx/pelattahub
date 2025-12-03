@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
 interface BillOfLadingPDFProps {
   order: {
     id: string
+    order_number?: string | null
     po_number?: string | null
     delivery_date: Date | string
     customer: {
@@ -181,7 +182,7 @@ export function BillOfLadingPDF({
     month: "long",
     day: "numeric",
   })
-  const billNumber = order.po_number || order.id.slice(0, 8).toUpperCase()
+  const billNumber = order.order_number || order.po_number || order.id.slice(0, 8).toUpperCase()
 
   // Calculate totals
   const totalQuantity = order.items.reduce(
@@ -258,7 +259,7 @@ export function BillOfLadingPDF({
               <View style={styles.row}>
                 <Text style={styles.label}>PO Number:</Text>
                 <Text style={styles.value}>
-                  {order.po_number || "N/A"}
+                  {order.order_number || order.po_number || "N/A"}
                 </Text>
               </View>
               <View style={styles.row}>

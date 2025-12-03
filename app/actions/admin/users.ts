@@ -5,13 +5,13 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import bcrypt from "bcryptjs"
 
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN") {
-    throw new Error("Admin access required")
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    throw new Error("Admin or Manager access required")
   }
   return session
 }
@@ -20,7 +20,7 @@ async function requireAdmin() {
  * Get all users
  */
 export async function getAllUsers() {
-  await requireAdmin()
+  await requireAdminOrManager()
   
   const users = await prisma.user.findMany({
     select: {
@@ -44,9 +44,9 @@ export async function createUser(data: {
   name: string
   email: string
   password: string
-  role: "ADMIN" | "RECEIVER" | "PACKER"
+  role: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER"
 }) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     // Check if email already exists
@@ -97,10 +97,10 @@ export async function updateUser(
   data: {
     name?: string
     email?: string
-    role?: "ADMIN" | "RECEIVER" | "PACKER"
+    role?: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER"
   }
 ) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     // If email is being updated, check for uniqueness
@@ -146,7 +146,7 @@ export async function updateUser(
  * Reset user password
  */
 export async function resetUserPassword(id: string, newPassword: string) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10)
@@ -171,7 +171,7 @@ export async function resetUserPassword(id: string, newPassword: string) {
  * Delete a user
  */
 export async function deleteUser(id: string) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     // Prevent deleting yourself

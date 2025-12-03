@@ -171,7 +171,7 @@ export async function getLotLifecycle(lotId: string) {
 }
 
 /**
- * Search for receiving events by PO number, lot number, or vendor
+ * Search for receiving events by PO number, lot number, vendor, or order number
  */
 export async function searchTraceability(query: string) {
   await requireAdmin()
@@ -231,9 +231,87 @@ export async function searchTraceability(query: string) {
     take: 10,
   })
 
+  // Normalize query for status matching
+  const normalizedQuery = query.trim().toLowerCase().replace(/[_-]/g, " ")
+  
+  // Determine if query matches order statuses (using string values)
+  const statusMatches: string[] = []
+  if (normalizedQuery.includes("ready") && normalizedQuery.includes("ship")) {
+    statusMatches.push("READY_TO_SHIP")
+  }
+  if (normalizedQuery.includes("shipped") || normalizedQuery === "ship") {
+    statusMatches.push("SHIPPED")
+  }
+  if (normalizedQuery.includes("confirmed")) {
+    statusMatches.push("CONFIRMED")
+  }
+  if (normalizedQuery.includes("picking") && !normalizedQuery.includes("partial")) {
+    statusMatches.push("PICKING")
+  }
+  if (normalizedQuery.includes("partial") && normalizedQuery.includes("pick")) {
+    statusMatches.push("PARTIAL_PICK")
+  }
+  if (normalizedQuery.includes("draft")) {
+    statusMatches.push("DRAFT")
+  }
+
+  // Build where clause for orders
+  const orderWhere: any = {
+    OR: [
+      { order_number: { contains: query, mode: "insensitive" } },
+      { po_number: { contains: query, mode: "insensitive" } },
+    ],
+  }
+
+  // Add status filter if query matches a status
+  if (statusMatches.length > 0) {
+    orderWhere.OR.push({ status: { in: statusMatches } })
+  }
+
+  // Search orders by order_number, po_number, or status
+  const orders = await prisma.order.findMany({
+    where: orderWhere,
+    include: {
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              unit_type: true,
+            },
+          },
+          picks: {
+            include: {
+              inventory_lot: {
+                select: {
+                  id: true,
+                  lot_number: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    take: 10,
+    orderBy: {
+      delivery_date: "desc",
+    },
+  })
+
   return {
     events,
     lots,
+    orders,
   }
 }
 

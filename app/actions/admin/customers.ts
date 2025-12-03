@@ -4,13 +4,13 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN") {
-    throw new Error("Admin access required")
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    throw new Error("Admin or Manager access required")
   }
   return session
 }
@@ -19,7 +19,7 @@ async function requireAdmin() {
  * Get all customers
  */
 export async function getAllCustomers() {
-  await requireAdmin()
+  await requireAdminOrManager()
   
   const customers = await prisma.customer.findMany({
     orderBy: { name: "asc" },
@@ -38,7 +38,7 @@ export async function createCustomer(data: {
   contact_email?: string
   active?: boolean
 }) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     // Check if code already exists
@@ -84,7 +84,7 @@ export async function updateCustomer(
     active?: boolean
   }
 ) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     // If code is being updated, check for uniqueness
@@ -124,7 +124,7 @@ export async function updateCustomer(
  * Delete a customer
  */
 export async function deleteCustomer(id: string) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     await prisma.customer.delete({

@@ -33,7 +33,7 @@ interface User {
   id: string
   name: string | null
   email: string
-  role: "ADMIN" | "RECEIVER" | "PACKER"
+  role: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER"
   createdAt: Date | string
   updatedAt: Date | string
 }
@@ -53,7 +53,7 @@ export function UsersManagement({ users }: UsersManagementProps) {
     name: "",
     email: "",
     password: "",
-    role: "RECEIVER" as "ADMIN" | "RECEIVER" | "PACKER",
+    role: "RECEIVER" as "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER",
   })
   const [newPassword, setNewPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -261,10 +261,11 @@ export function UsersManagement({ users }: UsersManagementProps) {
                   <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="RECEIVER">Receiver</SelectItem>
                   <SelectItem value="PACKER">Packer</SelectItem>
+                  <SelectItem value="MANAGER">Manager</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                ADMIN: Full system access. RECEIVER: Receiving operations. PACKER: Order fulfillment.
+                ADMIN: Full system access. RECEIVER: Receiving operations. PACKER: Order fulfillment. MANAGER: Receiving and picking operations.
               </p>
             </div>
 

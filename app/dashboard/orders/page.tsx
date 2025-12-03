@@ -2,8 +2,11 @@ import { getOrders } from "@/app/actions/orders"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Plus, Package } from "lucide-react"
+import { Plus, Package, Edit, Eye } from "lucide-react"
 import { format } from "date-fns"
+import { AllocateButton } from "@/components/orders/AllocateButton"
+import { OrderDetailButton } from "@/components/orders/OrderDetailButton"
+import { UnshipButton } from "@/components/orders/UnshipButton"
 
 export default async function OrdersPage() {
   const orders = await getOrders()
@@ -33,7 +36,7 @@ export default async function OrdersPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>
-                    Order {order.po_number || order.id.slice(0, 8)}
+                    Order {order.order_number || order.id.slice(0, 8)}
                   </CardTitle>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -79,6 +82,18 @@ export default async function OrdersPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
+                <OrderDetailButton order={order} />
+                {order.status === "DRAFT" && (
+                  <>
+                    <Link href={`/dashboard/orders/${order.id}/edit`}>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </Link>
+                    <AllocateButton orderId={order.id} />
+                  </>
+                )}
                 {(order.status === "CONFIRMED" ||
                   order.status === "PICKING" ||
                   order.status === "PARTIAL_PICK" ||
@@ -89,6 +104,9 @@ export default async function OrdersPage() {
                       Pick Order
                     </Button>
                   </Link>
+                )}
+                {order.status === "SHIPPED" && (
+                  <UnshipButton orderId={order.id} orderPoNumber={order.po_number} />
                 )}
               </CardFooter>
             </Card>

@@ -64,6 +64,9 @@ export const AuditAction = {
   // Integration/Sync
   SYNC: "SYNC",
   
+  // Bulk Operations
+  BULK_IMPORT: "BULK_IMPORT",
+  
   // Access
   LOGIN: "LOGIN",
   LOGOUT: "LOGOUT",

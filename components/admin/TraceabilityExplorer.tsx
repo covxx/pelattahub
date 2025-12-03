@@ -51,7 +51,7 @@ export function TraceabilityExplorer() {
           <div className="flex gap-2">
             <div className="flex-1">
               <Input
-                placeholder="Enter PO Number, Lot Number, or Vendor Name..."
+                placeholder="Enter Order Number, PO Number, Lot Number, Vendor Name, or Status (e.g., 'ready to ship', 'shipped')..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -64,7 +64,7 @@ export function TraceabilityExplorer() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Search by receiving event ID, lot number, vendor name, or vendor code
+            Search by order number, PO number, lot number, vendor name, vendor code, or order status (e.g., "ready to ship", "shipped")
           </p>
         </CardContent>
       </Card>
@@ -188,8 +188,112 @@ export function TraceabilityExplorer() {
             </div>
           )}
 
+          {/* Orders */}
+          {results.orders && results.orders.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Orders</h3>
+              {results.orders.map((order: any) => (
+                <Card key={order.id}>
+                  <CardHeader className="bg-muted/50">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">
+                          {order.customer.name}
+                        </CardTitle>
+                        <div className="text-sm text-muted-foreground space-x-2 mt-1">
+                          {order.order_number && (
+                            <>
+                              <span>Order #: {order.order_number}</span>
+                              <span>•</span>
+                            </>
+                          )}
+                          {order.po_number && (
+                            <>
+                              <span>PO #: {order.po_number}</span>
+                              <span>•</span>
+                            </>
+                          )}
+                          <span>{format(new Date(order.delivery_date), "MM/dd/yyyy")}</span>
+                          <span>•</span>
+                          <span>{order.items.length} item(s)</span>
+                        </div>
+                      </div>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          order.status === "SHIPPED"
+                            ? "bg-green-100 text-green-800"
+                            : order.status === "READY_TO_SHIP"
+                            ? "bg-purple-100 text-purple-800"
+                            : order.status === "PICKING" || order.status === "PARTIAL_PICK"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : order.status === "CONFIRMED"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {order.status}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="space-y-3">
+                      {order.items.map((item: any) => {
+                        const totalPicked = item.picks.reduce(
+                          (sum: number, pick: any) => sum + pick.quantity_picked,
+                          0
+                        )
+                        return (
+                          <div
+                            key={item.id}
+                            className="border rounded-lg p-3"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-1">
+                                <div className="font-semibold">{item.product.name}</div>
+                                <div className="text-sm text-muted-foreground space-x-2">
+                                  <span>SKU: {item.product.sku}</span>
+                                  <span>•</span>
+                                  <span>
+                                    {totalPicked} / {item.quantity_ordered} {item.product.unit_type} picked
+                                  </span>
+                                </div>
+                                {item.picks.length > 0 && (
+                                  <div className="text-xs text-muted-foreground mt-2">
+                                    <div className="font-medium mb-1">Picked from lots:</div>
+                                    <div className="space-y-1">
+                                      {item.picks.map((pick: any) => (
+                                        <div key={pick.id} className="flex items-center gap-2">
+                                          <span className="font-mono">{pick.inventory_lot.lot_number}</span>
+                                          <span>•</span>
+                                          <span>{pick.quantity_picked} {item.product.unit_type}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm text-muted-foreground">Ordered</div>
+                                <div className="text-2xl font-bold">
+                                  {item.quantity_ordered}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {item.product.unit_type}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
           {/* No Results */}
-          {results.events.length === 0 && results.lots.length === 0 && (
+          {results.events.length === 0 && results.lots.length === 0 && (!results.orders || results.orders.length === 0) && (
             <Card>
               <CardContent className="pt-6 text-center text-muted-foreground">
                 <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />

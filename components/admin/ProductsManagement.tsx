@@ -1,14 +1,51 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { DataTable } from "@/components/admin/DataTable"
+import { AddProductDialog } from "@/components/products/AddProductDialog"
+import { EditProductDialog } from "@/components/products/EditProductDialog"
+import { DeleteProductDialog } from "@/components/products/DeleteProductDialog"
+import { SmartImportModal } from "@/components/admin/SmartImportModal"
+import { Button } from "@/components/ui/button"
+import { Upload, Plus } from "lucide-react"
 import type { Product } from "@/types/product"
 
 interface ProductsManagementProps {
   products: Product[]
 }
 
-export function ProductsManagement({ products }: ProductsManagementProps) {
+export function ProductsManagement({ products: initialProducts }: ProductsManagementProps) {
+  const router = useRouter()
+  const [products, setProducts] = useState<Product[]>(initialProducts)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const handleProductAdded = (newProduct: Product) => {
+    setProducts((prev) => [newProduct, ...prev])
+    setIsAddDialogOpen(false)
+    router.refresh()
+  }
+
+  const handleProductUpdated = (updatedProduct: Product) => {
+    setProducts((prev) =>
+      prev.map((product) =>
+        product.id === updatedProduct.id ? updatedProduct : product
+      )
+    )
+    setEditingProduct(null)
+    router.refresh()
+  }
+
+  const handleProductDeleted = (productId: string) => {
+    setProducts((prev) => prev.filter((product) => product.id !== productId))
+    setDeletingProduct(null)
+    router.refresh()
+  }
+
   const columns = [
     {
       header: "Image",
@@ -58,23 +95,59 @@ export function ProductsManagement({ products }: ProductsManagementProps) {
 
   return (
     <div>
-      <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <p className="text-sm text-blue-800 dark:text-blue-300">
-          <strong>Note:</strong> Products management is now in the Admin workspace. The existing
-          product dialogs in the main /dashboard/products page still work for now, but will be
-          fully migrated here in the next update.
-        </p>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">Products</h2>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>
+          <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+        </div>
       </div>
-      
       <DataTable
-        title="Products"
+        title=""
         data={products}
         columns={columns}
         searchPlaceholder="Search products by name, SKU, or GTIN..."
-        addButtonLabel="Add Product"
         getRowId={(row) => row.id}
         searchKeys={["name", "sku", "gtin"]}
+        onEdit={(product) => setEditingProduct(product as Product)}
+        onDelete={(product) => setDeletingProduct(product as Product)}
       />
+
+      <SmartImportModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        type="PRODUCT"
+      />
+
+      <AddProductDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onProductAdded={handleProductAdded}
+      />
+
+      {editingProduct && (
+        <EditProductDialog
+          product={editingProduct}
+          open={!!editingProduct}
+          onOpenChange={(open) => !open && setEditingProduct(null)}
+          onProductUpdated={handleProductUpdated}
+        />
+      )}
+
+      {deletingProduct && (
+        <DeleteProductDialog
+          product={deletingProduct}
+          open={!!deletingProduct}
+          onOpenChange={(open) => !open && setDeletingProduct(null)}
+          onProductDeleted={handleProductDeleted}
+        />
+      )}
     </div>
   )
 }

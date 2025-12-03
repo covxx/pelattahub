@@ -33,7 +33,7 @@ export default async function PickingPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>
-                    Order {order.po_number || order.id.slice(0, 8)}
+                    Order #{order.order_number}
                   </CardTitle>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-medium ${

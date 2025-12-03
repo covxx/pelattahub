@@ -14,7 +14,7 @@ export default async function SystemHealthPage() {
     redirect("/login")
   }
 
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
     redirect("/dashboard")
   }
 

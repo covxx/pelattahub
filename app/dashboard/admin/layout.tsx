@@ -10,12 +10,12 @@ export default async function AdminLayout({
 }) {
   const session = await auth()
 
-  // Security Check: Only ADMIN role can access
+  // Security Check: Only ADMIN and MANAGER roles can access
   if (!session?.user) {
     redirect("/login")
   }
 
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
     redirect("/dashboard")
   }
 
@@ -47,9 +47,11 @@ export default async function AdminLayout({
           <AdminNavLink href="/dashboard/admin/customers">
             🏢 Customers
           </AdminNavLink>
-          <AdminNavLink href="/dashboard/admin/logs">
-            📋 System Logs
-          </AdminNavLink>
+          {session.user.role === "ADMIN" && (
+            <AdminNavLink href="/dashboard/admin/logs">
+              📋 System Logs
+            </AdminNavLink>
+          )}
           <AdminNavLink href="/dashboard/admin/traceability">
             🔍 Traceability
           </AdminNavLink>

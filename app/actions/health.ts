@@ -6,13 +6,13 @@ import { logActivity } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
 import { unstable_noStore as noStore } from "next/cache"
 
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN") {
-    throw new Error("Admin access required")
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    throw new Error("Admin or Manager access required")
   }
   return session
 }
@@ -49,7 +49,7 @@ function formatUptime(seconds: number): string {
  * Get system health metrics
  */
 export async function getSystemHealth(): Promise<SystemHealth> {
-  await requireAdmin()
+  await requireAdminOrManager()
   
   // Prevent caching - health data must be real-time
   noStore()
@@ -162,7 +162,7 @@ export async function getSystemHealth(): Promise<SystemHealth> {
  * Purge Next.js cache
  */
 export async function purgeCache() {
-  await requireAdmin()
+  await requireAdminOrManager()
   
   try {
     revalidatePath("/", "layout")
@@ -180,7 +180,7 @@ export async function purgeCache() {
  * Use with caution - this will close all database connections
  */
 export async function disconnectPrisma() {
-  await requireAdmin()
+  await requireAdminOrManager()
   
   try {
     await prisma.$disconnect()
@@ -197,7 +197,7 @@ export async function disconnectPrisma() {
  * Run garbage collection (mostly placebo, but logs maintenance activity)
  */
 export async function runGarbageCollection() {
-  const session = await requireAdmin()
+  const session = await requireAdminOrManager()
   
   try {
     // Log the maintenance activity

@@ -8,10 +8,13 @@ import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 /**
  * Check if current user is admin
  */
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
-  if (!session?.user || session.user.role !== "ADMIN") {
-    throw new Error("Unauthorized: Admin access required")
+  if (!session?.user) {
+    throw new Error("Unauthorized")
+  }
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    throw new Error("Unauthorized: Admin or Manager access required")
   }
   return session
 }
@@ -93,7 +96,7 @@ export async function createProduct(data: {
   target_temp_f?: number | null
   image_url?: string | null
 }) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   // Validate input
   if (!data.sku || !data.name) {
@@ -151,7 +154,7 @@ export async function createProduct(data: {
     )
   }
 
-  revalidatePath("/dashboard/products")
+  revalidatePath("/dashboard/admin/products")
   return { success: true, product }
 }
 
@@ -173,7 +176,7 @@ export async function updateProduct(
     image_url?: string | null
   }
 ) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   // If SKU is being updated, check for uniqueness
   if (data.sku) {
@@ -247,7 +250,7 @@ export async function updateProduct(
     )
   }
 
-  revalidatePath("/dashboard/products")
+  revalidatePath("/dashboard/admin/products")
   return { success: true, product }
 }
 
@@ -255,7 +258,7 @@ export async function updateProduct(
  * Delete a product (Admin only)
  */
 export async function deleteProduct(id: string) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   // Check if product has associated lots
   const product = await prisma.product.findUnique({
@@ -281,7 +284,7 @@ export async function deleteProduct(id: string) {
     where: { id },
   })
 
-  revalidatePath("/dashboard/products")
+  revalidatePath("/dashboard/admin/products")
   return { success: true }
 }
 

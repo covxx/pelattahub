@@ -80,8 +80,10 @@ export async function adjustLotQuantity(input: AdjustLotQuantityInput) {
     // Determine new status based on quantity
     let newStatus = lot.status
     if (newQuantity === 0) {
-      // If quantity is zero, mark as DEPLETED
-      newStatus = LotStatus.DEPLETED
+      // If quantity is manually adjusted to zero, mark as EXPIRED
+      // DEPLETED should only be used for lots consumed through order fulfillment (picking)
+      // EXPIRED indicates the lot is no longer usable due to correction/adjustment
+      newStatus = LotStatus.EXPIRED
     } else if ((lot.status === LotStatus.EXPIRED || lot.status === LotStatus.DEPLETED) && newQuantity > 0) {
       // If restoring quantity to a previously expired/depleted lot, mark as AVAILABLE
       newStatus = LotStatus.AVAILABLE

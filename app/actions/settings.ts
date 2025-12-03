@@ -5,13 +5,13 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN") {
-    throw new Error("Admin access required")
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    throw new Error("Admin or Manager access required")
   }
   return session
 }
@@ -76,7 +76,7 @@ export async function updateCompanySettings(data: {
   company_address?: string
   gs1_prefix?: string
 }) {
-  const session = await requireAdmin()
+  const session = await requireAdminOrManager()
 
   try {
     const updates = []
@@ -172,7 +172,7 @@ export async function updateSetting(
   value: string,
   description?: string
 ) {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   const setting = await prisma.systemSetting.upsert({
     where: { key },
@@ -190,6 +190,146 @@ export async function updateSetting(
 
   revalidatePath("/dashboard/admin/settings")
   return setting
+}
+
+/**
+ * Require ADMIN role strictly (no MANAGER access)
+ */
+async function requireAdmin() {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error("Unauthorized")
+  }
+  if (session.user.role !== "ADMIN") {
+    throw new Error("Admin access required")
+  }
+  return session
+}
+
+/**
+ * Reset database - DANGEROUS OPERATION
+ * Deletes all operational data but preserves users
+ * 
+ * CRITICAL: Only ADMIN can perform this operation
+ * CRITICAL: User table is NOT deleted to prevent lockout
+ */
+export async function resetDatabase(): Promise<{
+  success: boolean
+  error?: string
+  deletedCounts?: {
+    orderPicks: number
+    orderAllocations: number
+    orderItems: number
+    orders: number
+    inventoryLots: number
+    receivingEvents: number
+    products: number
+    customers: number
+    vendors: number
+  }
+}> {
+  const session = await requireAdmin()
+
+  try {
+    // Log the reset event BEFORE deletion (so it's preserved)
+    // We'll create a special audit log entry
+    const currentUserId = session.user.id
+    const currentUserEmail = session.user.email
+
+    // Get counts before deletion for reporting
+    const [
+      orderPicksCount,
+      orderAllocationsCount,
+      orderItemsCount,
+      ordersCount,
+      inventoryLotsCount,
+      receivingEventsCount,
+      productsCount,
+      customersCount,
+      vendorsCount,
+    ] = await Promise.all([
+      prisma.orderPick.count(),
+      prisma.orderAllocation.count(),
+      prisma.orderItem.count(),
+      prisma.order.count(),
+      prisma.inventoryLot.count(),
+      prisma.receivingEvent.count(),
+      prisma.product.count(),
+      prisma.customer.count(),
+      prisma.vendor.count(),
+    ])
+
+    // Perform deletion in transaction
+    // Order matters due to foreign key constraints
+    await prisma.$transaction(async (tx) => {
+      // Delete in order: child tables first, then parent tables
+      await tx.orderPick.deleteMany({})
+      await tx.orderAllocation.deleteMany({})
+      await tx.orderItem.deleteMany({})
+      await tx.order.deleteMany({})
+      await tx.inventoryLot.deleteMany({})
+      await tx.receivingEvent.deleteMany({})
+      await tx.product.deleteMany({})
+      await tx.customer.deleteMany({})
+      await tx.vendor.deleteMany({})
+    })
+
+    // Log the reset event AFTER deletion (re-create audit log)
+    // This ensures the log entry exists even if we deleted audit logs
+    try {
+      await prisma.auditLog.create({
+        data: {
+          user_id: currentUserId,
+          action: "DATABASE_RESET",
+          entity_type: "SYSTEM",
+          entity_id: "FULL_RESET",
+          details: {
+            summary: "Database reset - all operational data deleted",
+            deletedCounts: {
+              orderPicks: orderPicksCount,
+              orderAllocations: orderAllocationsCount,
+              orderItems: orderItemsCount,
+              orders: ordersCount,
+              inventoryLots: inventoryLotsCount,
+              receivingEvents: receivingEventsCount,
+              products: productsCount,
+              customers: customersCount,
+              vendors: vendorsCount,
+            },
+            performedBy: currentUserEmail,
+            timestamp: new Date().toISOString(),
+          },
+        },
+      })
+    } catch (logError) {
+      // If logging fails, continue - the reset was successful
+      console.error("Failed to log database reset:", logError)
+    }
+
+    // Revalidate all paths
+    revalidatePath("/", "layout")
+
+    return {
+      success: true,
+      deletedCounts: {
+        orderPicks: orderPicksCount,
+        orderAllocations: orderAllocationsCount,
+        orderItems: orderItemsCount,
+        orders: ordersCount,
+        inventoryLots: inventoryLotsCount,
+        receivingEvents: receivingEventsCount,
+        products: productsCount,
+        customers: customersCount,
+        vendors: vendorsCount,
+      },
+    }
+  } catch (error) {
+    console.error("Database reset error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to reset database",
+    }
+  }
 }
 
 

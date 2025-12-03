@@ -18,7 +18,7 @@ COPY . .
 # Generate Prisma Client
 # Provide a dummy DATABASE_URL for build time (prisma generate doesn't actually connect)
 ENV DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy?schema=public"
-RUN npx prisma generate
+RUN npx prisma@6.19.0 generate
 
 # Build Next.js application
 ENV NEXT_TELEMETRY_DISABLED=1

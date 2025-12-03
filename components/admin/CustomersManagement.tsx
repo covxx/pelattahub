@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { DataTable } from "@/components/admin/DataTable"
+import { SmartImportModal } from "@/components/admin/SmartImportModal"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Upload } from "lucide-react"
 import {
   createCustomer,
   updateCustomer,
@@ -46,6 +48,7 @@ export function CustomersManagement({ customers }: CustomersManagementProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [formData, setFormData] = useState({
     name: "",
@@ -151,8 +154,17 @@ export function CustomersManagement({ customers }: CustomersManagementProps) {
 
   return (
     <>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">Customers</h2>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+        </div>
+      </div>
       <DataTable
-        title="Customers"
+        title=""
         data={customers}
         columns={columns}
         searchPlaceholder="Search customers by name or code..."
@@ -162,6 +174,12 @@ export function CustomersManagement({ customers }: CustomersManagementProps) {
         onDelete={handleDelete}
         getRowId={(row) => row.id}
         searchKeys={["name", "code"]}
+      />
+
+      <SmartImportModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        type="CUSTOMER"
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

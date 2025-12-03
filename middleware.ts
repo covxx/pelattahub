@@ -15,8 +15,8 @@ export default auth((req) => {
       return NextResponse.redirect(loginUrl)
     }
 
-    // If logged in but not ADMIN role, redirect to forbidden page
-    if (userRole !== "ADMIN") {
+    // If logged in but not ADMIN or MANAGER role, redirect to forbidden page
+    if (userRole !== "ADMIN" && userRole !== "MANAGER") {
       return NextResponse.redirect(new URL("/forbidden", req.url))
     }
   }

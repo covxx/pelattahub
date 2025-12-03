@@ -3,13 +3,13 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN") {
-    throw new Error("Admin access required")
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    throw new Error("Admin or Manager access required")
   }
   return session
 }
@@ -18,7 +18,7 @@ async function requireAdmin() {
  * Get admin dashboard statistics
  */
 export async function getAdminStats() {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   const [productCount, vendorCount, userCount, customerCount] = await Promise.all([
     prisma.product.count(),

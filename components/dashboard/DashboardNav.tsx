@@ -32,13 +32,13 @@ const navigation = [
     name: "Inventory",
     href: "/dashboard/inventory",
     icon: Package,
-    roles: ["ADMIN", "RECEIVER", "PACKER"],
+    roles: ["ADMIN", "RECEIVER", "PACKER", "MANAGER"],
   },
   {
     name: "Receiving",
     href: "/dashboard/receiving",
     icon: TruckIcon,
-    roles: ["ADMIN", "RECEIVER"],
+    roles: ["ADMIN", "RECEIVER", "MANAGER"],
   },
   {
     name: "Orders",
@@ -50,7 +50,7 @@ const navigation = [
     name: "Picking",
     href: "/dashboard/picking",
     icon: Hand,
-    roles: ["ADMIN", "PACKER"],
+    roles: ["ADMIN", "PACKER", "MANAGER"],
   },
   {
     name: "Users",
@@ -65,7 +65,7 @@ const adminNavigation = [
     name: "Admin Dashboard",
     href: "/dashboard/admin",
     icon: Settings,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     name: "System Logs",
@@ -77,19 +77,25 @@ const adminNavigation = [
     name: "Traceability",
     href: "/dashboard/admin/traceability",
     icon: Search,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     name: "QuickBooks Sync",
     href: "/dashboard/admin/integrations/qbo",
     icon: Link2,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     name: "System Health",
     href: "/dashboard/admin/health",
     icon: Activity,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    name: "Products",
+    href: "/dashboard/admin/products",
+    icon: Package,
+    roles: ["ADMIN", "MANAGER"],
   },
 ]
 
@@ -158,7 +164,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
                 </ul>
               </li>
 
-              {/* Admin Section - Only for ADMIN role */}
+              {/* Admin Section - For ADMIN and MANAGER roles */}
               {filteredAdminNav.length > 0 && (
                 <li>
                   <div className="text-xs font-semibold leading-6 text-gray-400 dark:text-gray-500">

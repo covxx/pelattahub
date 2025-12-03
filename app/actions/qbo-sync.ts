@@ -12,13 +12,13 @@ import {
 } from "@/lib/qbo"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN") {
-    throw new Error("Admin access required")
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    throw new Error("Admin or Manager access required")
   }
   return session
 }
@@ -28,7 +28,7 @@ async function requireAdmin() {
  * Upserts QBO customers into WMS customers table
  */
 export async function importQboCustomers() {
-  const session = await requireAdmin()
+  const session = await requireAdminOrManager()
 
   try {
     // Check connection status
@@ -130,7 +130,7 @@ export async function importQboCustomers() {
  * Upserts QBO items into WMS products table
  */
 export async function importQboItems() {
-  const session = await requireAdmin()
+  const session = await requireAdminOrManager()
 
   try {
     // Check connection status
@@ -254,7 +254,7 @@ export async function importQboItems() {
  * Get QBO connection status
  */
 export async function getQboStatus() {
-  await requireAdmin()
+  await requireAdminOrManager()
 
   try {
     const status = await getQboConnectionStatus()
