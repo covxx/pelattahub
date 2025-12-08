@@ -211,6 +211,7 @@ model Product {
 // Receiving Event Model - Batch Receiving Header
 model ReceivingEvent {
   id              String           @id @default(uuid()) @db.Uuid
+  receipt_number  Int              @unique
   vendor_id       String           @db.Uuid
   vendor          Vendor           @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
   received_date   DateTime
@@ -229,6 +230,7 @@ model ReceivingEvent {
   @@index([created_by])
   @@index([received_date])
   @@index([status])
+  @@index([receipt_number])
   @@map("receiving_events")
 }
 

@@ -11,6 +11,7 @@ export type ReceivingStatus = "OPEN" | "FINALIZED"
 
 export interface ReceivingEvent {
   id: string
+  receipt_number?: number
   vendor_id: string
   received_date: Date | string
   status: ReceivingStatus

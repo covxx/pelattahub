@@ -380,7 +380,7 @@ export function BatchReceivingForm({
               ✓ Receiving Complete
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Receipt #: <span className="font-mono font-bold">{receivingEvent.id.slice(0, 8).toUpperCase()}</span>
+              Receipt #: <span className="font-mono font-bold">{receivingEvent.receipt_number || receivingEvent.id.slice(0, 8).toUpperCase()}</span>
             </p>
           </div>
           <div className="flex gap-2">
@@ -411,8 +411,8 @@ export function BatchReceivingForm({
             open={showPDFModal}
             onOpenChange={setShowPDFModal}
             pdfUrl={`/api/receipt/pdf?eventId=${receivingEvent.id}`}
-            filename={`Receiving_Receipt_${receivingEvent.id.slice(0, 8).toUpperCase()}.pdf`}
-            title={`Receiving Receipt #${receivingEvent.id.slice(0, 8).toUpperCase()}`}
+            filename={`Receiving_Receipt_${receivingEvent.receipt_number || receivingEvent.id.slice(0, 8).toUpperCase()}.pdf`}
+            title={`Receiving Receipt #${receivingEvent.receipt_number || receivingEvent.id.slice(0, 8).toUpperCase()}`}
           />
         )}
 

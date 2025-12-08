@@ -5,6 +5,7 @@ import { format } from "date-fns"
 interface ReceivingReceiptProps {
   receivingEvent: {
     id: string
+    receipt_number?: number
     received_date: Date | string
     vendor: {
       name: string
@@ -34,7 +35,7 @@ export function ReceivingReceipt({ receivingEvent }: ReceivingReceiptProps) {
 
   const receivedDate = new Date(receivingEvent.received_date)
   const formattedDate = format(receivedDate, "MM/dd/yyyy")
-  const receiptNumber = receivingEvent.id.slice(0, 8).toUpperCase()
+  const receiptNumber = receivingEvent.receipt_number?.toString() || receivingEvent.id.slice(0, 8).toUpperCase()
 
   return (
     <>

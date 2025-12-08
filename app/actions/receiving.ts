@@ -51,9 +51,14 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
 
     // Use transaction to ensure all-or-nothing behavior
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create the ReceivingEvent
+      // 1. Generate receipt number
+      const { getNextReceiptNumber } = await import("@/lib/receipt-number")
+      const receiptNumber = await getNextReceiptNumber(tx)
+      
+      // 2. Create the ReceivingEvent
       const receivingEvent = await tx.receivingEvent.create({
         data: {
+          receipt_number: receiptNumber,
           vendor_id: input.vendorId,
           received_date: input.date,
           created_by: session.user.id,

@@ -85,7 +85,7 @@ export function TraceabilityExplorer() {
                           {event.vendor.name}
                         </CardTitle>
                         <div className="text-sm text-muted-foreground space-x-2 mt-1">
-                          <span>Receipt #: {event.id.slice(0, 8).toUpperCase()}</span>
+                          <span>Receipt #: {event.receipt_number || event.id.slice(0, 8).toUpperCase()}</span>
                           <span>•</span>
                           <span>{format(new Date(event.received_date), "MM/dd/yyyy")}</span>
                           <span>•</span>

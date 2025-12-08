@@ -16,28 +16,28 @@ import {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    fontSize: 10,
+    padding: 30,
+    fontSize: 9,
     fontFamily: "Helvetica",
   },
   header: {
-    marginBottom: 25,
-    borderBottom: "2 solid #000",
-    paddingBottom: 20,
+    marginBottom: 12,
+    borderBottom: "1.5 solid #000",
+    paddingBottom: 10,
   },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 15,
+    marginBottom: 8,
   },
   companyInfo: {
     flex: 1,
   },
   logoContainer: {
-    width: 180,
-    height: 90,
-    marginBottom: 12,
+    width: 220,
+    height: 110,
+    marginBottom: 8,
   },
   logo: {
     width: "100%",
@@ -45,76 +45,100 @@ const styles = StyleSheet.create({
     objectFit: "contain",
   },
   companyName: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "bold",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   companyDetails: {
-    fontSize: 9,
+    fontSize: 8,
     color: "#666",
-    lineHeight: 1.6,
+    lineHeight: 1.4,
   },
   receiptInfo: {
     textAlign: "right",
-    minWidth: 200,
+    minWidth: 150,
   },
   receiptTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: 4,
     color: "#000",
   },
   receiptNumber: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: "Courier",
     color: "#333",
   },
+  detailsSection: {
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  detailsLeft: {
+    width: "48%",
+  },
+  detailsRight: {
+    width: "48%",
+  },
+  detailRow: {
+    flexDirection: "row",
+    marginBottom: 4,
+    fontSize: 8,
+  },
+  detailLabel: {
+    fontWeight: "bold",
+    color: "#444",
+    width: "40%",
+  },
+  detailValue: {
+    color: "#000",
+    width: "60%",
+  },
   section: {
-    marginBottom: 25,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "bold",
-    marginBottom: 12,
-    borderBottom: "1.5 solid #333",
-    paddingBottom: 6,
+    marginBottom: 6,
+    borderBottom: "1 solid #333",
+    paddingBottom: 3,
     color: "#000",
   },
   row: {
     flexDirection: "row",
-    marginBottom: 10,
-    paddingBottom: 6,
+    marginBottom: 4,
+    paddingBottom: 3,
     borderBottom: "0.5 solid #eee",
   },
   label: {
     width: "35%",
     fontWeight: "bold",
     color: "#444",
-    fontSize: 10,
+    fontSize: 8,
   },
   value: {
     width: "65%",
-    fontSize: 10,
+    fontSize: 8,
     color: "#000",
   },
   table: {
-    marginTop: 15,
+    marginTop: 8,
     border: "1 solid #ddd",
-    borderRadius: 2,
   },
   tableHeader: {
     flexDirection: "row",
     backgroundColor: "#f5f5f5",
-    padding: 10,
+    padding: 6,
     fontWeight: "bold",
-    fontSize: 9,
-    borderBottom: "2 solid #333",
+    fontSize: 8,
+    borderBottom: "1.5 solid #333",
   },
   tableRow: {
     flexDirection: "row",
-    padding: 10,
-    borderBottom: "1 solid #eee",
-    fontSize: 9,
+    padding: 5,
+    borderBottom: "0.5 solid #eee",
+    fontSize: 8,
     backgroundColor: "#fff",
   },
   colLot: {
@@ -140,25 +164,27 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   footer: {
-    marginTop: 30,
-    paddingTop: 15,
+    marginTop: 8,
+    paddingTop: 8,
     borderTop: "1 solid #ccc",
-    fontSize: 8,
+    fontSize: 7,
     color: "#666",
     textAlign: "center",
   },
   totalRow: {
     flexDirection: "row",
-    marginTop: 10,
-    paddingTop: 10,
-    borderTop: "2 solid #000",
+    marginTop: 5,
+    paddingTop: 6,
+    borderTop: "1.5 solid #000",
     fontWeight: "bold",
+    fontSize: 9,
   },
 })
 
 interface ReceivingReceiptPDFProps {
   receivingEvent: {
     id: string
+    receipt_number?: number
     received_date: Date | string
     vendor: {
       name: string
@@ -244,7 +270,7 @@ export function ReceivingReceiptPDF({
       month: "long",
       day: "numeric",
     })
-    const receiptNumber = receivingEvent.id?.slice(0, 8).toUpperCase() || "UNKNOWN"
+    const receiptNumber = receivingEvent.receipt_number?.toString() || "UNKNOWN"
 
     // Calculate totals
     const totalQuantity = receivingEvent.lots.reduce(
@@ -292,51 +318,49 @@ export function ReceivingReceiptPDF({
           </View>
         </View>
 
-        {/* Vendor Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vendor Information</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Vendor Name:</Text>
-            <Text style={styles.value}>
-              {receivingEvent.vendor.name} ({receivingEvent.vendor.code})
-            </Text>
-          </View>
-          {receivingEvent.vendor.address && (
-            <View style={styles.row}>
-              <Text style={styles.label}>Address:</Text>
-              <Text style={styles.value}>{receivingEvent.vendor.address}</Text>
-            </View>
-          )}
-          {receivingEvent.vendor.contact_email && (
-            <View style={styles.row}>
-              <Text style={styles.label}>Contact:</Text>
-              <Text style={styles.value}>
-                {receivingEvent.vendor.contact_email}
+        {/* Compact Details Section - Two Columns */}
+        <View style={styles.detailsSection}>
+          <View style={styles.detailsLeft}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Vendor:</Text>
+              <Text style={styles.detailValue}>
+                {receivingEvent.vendor.name} ({receivingEvent.vendor.code})
               </Text>
             </View>
-          )}
+            {receivingEvent.vendor.address && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Address:</Text>
+                <Text style={styles.detailValue}>{receivingEvent.vendor.address}</Text>
+              </View>
+            )}
+            {receivingEvent.vendor.contact_email && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Contact:</Text>
+                <Text style={styles.detailValue}>
+                  {receivingEvent.vendor.contact_email}
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.detailsRight}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Date:</Text>
+              <Text style={styles.detailValue}>{formattedDate}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Received By:</Text>
+              <Text style={styles.detailValue}>
+                {receivingEvent.user?.name || "Unknown"}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Total Items:</Text>
+              <Text style={styles.detailValue}>{receivingEvent.lots.length} lot(s)</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Receiving Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Receiving Details</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Date Received:</Text>
-            <Text style={styles.value}>{formattedDate}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Received By:</Text>
-            <Text style={styles.value}>
-              {receivingEvent.user?.name || "Unknown"}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Total Items:</Text>
-            <Text style={styles.value}>{receivingEvent.lots.length} lot(s)</Text>
-          </View>
-        </View>
-
-        {/* Items Table */}
+        {/* Items Table - Takes up remaining space */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Items Received</Text>
           <View style={styles.table}>

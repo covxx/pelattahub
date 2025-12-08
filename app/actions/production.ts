@@ -450,15 +450,25 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
         },
       })
 
-      // 7. Create production run records for each source lot
+      // 7. Calculate total quantity consumed for proportional allocation
+      const totalQuantityConsumed = sourceLotData.reduce(
+        (sum, { quantityConsumed }) => sum + quantityConsumed,
+        0
+      )
+
+      // 8. Create production run records for each source lot
+      // Allocate quantity_produced proportionally based on quantity_consumed
       for (const { lot, quantityConsumed } of sourceLotData) {
+        // Calculate proportional contribution: (quantityConsumed / totalQuantityConsumed) * quantityProduced
+        const proportionalProduced = (quantityConsumed / totalQuantityConsumed) * quantityProduced
+        
         await tx.productionRun.create({
           data: {
             user_id: session.user.id,
             source_lot_id: lot.id,
             destination_lot_id: destinationLot.id,
             quantity_consumed: quantityConsumed,
-            quantity_produced: quantityProduced, // Total produced from all sources
+            quantity_produced: proportionalProduced, // Proportional share of total produced
             notes: notes || null,
           },
         })
@@ -467,11 +477,13 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
       return {
         sourceLots: updatedSourceLots,
         destinationLot,
+        totalQuantityConsumed: totalQuantityConsumed, // Return the rounded total from transaction
       }
     })
 
-    // 8. Log audit activity
-    const totalQuantityConsumed = sourceLots.reduce((sum, s) => sum + s.quantityConsumed, 0)
+    // 9. Log audit activity
+    // Use the rounded total from the transaction to match ProductionRun records
+    const totalQuantityConsumed = result.totalQuantityConsumed
     await logActivity(
       session.user.id,
       AuditAction.CONVERT_LOT,

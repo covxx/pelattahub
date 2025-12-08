@@ -281,9 +281,10 @@ export function generateCaseLabel(
  * Generates a Master Pallet Label - 4x6 inches
  * Label size: 4x6 inches (812 dots x 1218 dots at 203 DPI)
  * Shows: Vendor, Total Amount, Received Date, Product, Lot Number
+ * Includes scannable barcode for warehouse operations
  * 
  * @param lot - Inventory lot data (must include receivingEvent with vendor)
- * @param product - Product data
+ * @param product - Product data (should include GTIN for GS1-128 barcode)
  * @returns ZPL string
  */
 export function generateMasterLabel(
@@ -302,6 +303,7 @@ export function generateMasterLabel(
   product: {
     name: string
     unit_type?: string
+    gtin?: string
   }
 ): string {
   const lotNumber = lot.lot_number
@@ -324,6 +326,23 @@ export function generateMasterLabel(
   const safeVendorName = escapeZPL(vendorName)
   const safeVendorCode = escapeZPL(vendorCode)
   const safeQuantityDisplay = escapeZPL(quantityDisplay)
+
+  // Generate barcode data
+  // If GTIN is available, use GS1-128 format (preferred for warehouse operations)
+  // Otherwise, use simple Code 128 with lot number
+  let barcodeData: string
+  let barcodeHRI: string
+  
+  if (product.gtin) {
+    const gtin = padGTIN(product.gtin)
+    // GS1-128 format: (01){gtin}(10){lotNumber}
+    barcodeData = `>;>801${gtin}>610${safeLotNumber}`
+    barcodeHRI = `(01) ${gtin} (10) ${safeLotNumber}`
+  } else {
+    // Fallback: Simple Code 128 with lot number only
+    barcodeData = safeLotNumber
+    barcodeHRI = safeLotNumber
+  }
 
   // ZPL Commands for 4x6 label (Master Pallet Label)
   const zpl = `^XA
@@ -369,6 +388,10 @@ export function generateMasterLabel(
 
 ^CF0,30
 ^FO50,600^FDLot Number: ${safeLotNumber}^FS
+
+^BY3,3,100^FO50,700^BCN,120,N,N^FD${barcodeData}^FS
+^CF0,20
+^FO50,830^FB712,1,0,C,0^FD${barcodeHRI}^FS
 
 ^XZ`
 
@@ -488,12 +511,12 @@ export function generatePTILabel(
 ^LL406
 ^LS0
 
-^BY2,3,70^FT200,90^BCN,,N,N^FD${barcodeData}^FS
+^BY2,3,70^FO50,30^BCN,100,N,N^FD${barcodeData}^FS
 ^CF0,14
-^FO0,95^FB812,1,0,C,0^FD${barcodeHRI}^FS
+^FO0,140^FB812,1,0,C,0^FD${barcodeHRI}^FS
 
 ^CF0,${productFontHeight},${productFontWidth}
-^FO0,130^FB812,1,0,C,0^FD${safeProductName}\\&^FS
+^FO0,165^FB812,1,0,C,0^FD${safeProductName}\\&^FS
 
 ^CF0,18
 ^FO20,220^FDProduct of ${safeOrigin}^FS

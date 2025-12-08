@@ -171,7 +171,7 @@ export function ReceivingEventDetail({
           </Button>
           <h1 className="text-3xl font-bold">Receiving Receipt</h1>
           <p className="text-muted-foreground">
-            Receipt #: <span className="font-mono font-bold">{event.id.slice(0, 8).toUpperCase()}</span>
+            Receipt #: <span className="font-mono font-bold">{event.receipt_number || event.id.slice(0, 8).toUpperCase()}</span>
           </p>
         </div>
 
@@ -216,8 +216,8 @@ export function ReceivingEventDetail({
           open={showPDFModal}
           onOpenChange={setShowPDFModal}
           pdfUrl={`/api/receipt/pdf?eventId=${event.id}`}
-          filename={`Receiving_Receipt_${event.id.slice(0, 8).toUpperCase()}.pdf`}
-          title={`Receiving Receipt #${event.id.slice(0, 8).toUpperCase()}`}
+          filename={`Receiving_Receipt_${event.receipt_number || event.id.slice(0, 8).toUpperCase()}.pdf`}
+          title={`Receiving Receipt #${event.receipt_number || event.id.slice(0, 8).toUpperCase()}`}
         />
       )}
 
