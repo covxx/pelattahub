@@ -5,6 +5,7 @@ import {
   Text,
   View,
   StyleSheet,
+  Image,
 } from "@react-pdf/renderer"
 
 // Register fonts if needed (optional)
@@ -20,71 +21,101 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
   },
   header: {
-    marginBottom: 30,
+    marginBottom: 25,
     borderBottom: "2 solid #000",
-    paddingBottom: 15,
+    paddingBottom: 20,
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 15,
+  },
+  companyInfo: {
+    flex: 1,
+  },
+  logoContainer: {
+    width: 180,
+    height: 90,
+    marginBottom: 12,
+  },
+  logo: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
   },
   companyName: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 5,
+    marginBottom: 6,
   },
   companyDetails: {
     fontSize: 9,
     color: "#666",
-    lineHeight: 1.5,
+    lineHeight: 1.6,
   },
   receiptInfo: {
-    marginTop: 10,
     textAlign: "right",
+    minWidth: 200,
   },
   receiptTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 5,
+    marginBottom: 8,
+    color: "#000",
   },
   receiptNumber: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Courier",
+    color: "#333",
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "bold",
-    marginBottom: 10,
-    borderBottom: "1 solid #ccc",
-    paddingBottom: 5,
+    marginBottom: 12,
+    borderBottom: "1.5 solid #333",
+    paddingBottom: 6,
+    color: "#000",
   },
   row: {
     flexDirection: "row",
-    marginBottom: 8,
+    marginBottom: 10,
+    paddingBottom: 6,
+    borderBottom: "0.5 solid #eee",
   },
   label: {
-    width: "30%",
+    width: "35%",
     fontWeight: "bold",
-    color: "#666",
+    color: "#444",
+    fontSize: 10,
   },
   value: {
-    width: "70%",
+    width: "65%",
+    fontSize: 10,
+    color: "#000",
   },
   table: {
     marginTop: 15,
+    border: "1 solid #ddd",
+    borderRadius: 2,
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: "#f0f0f0",
-    padding: 8,
+    backgroundColor: "#f5f5f5",
+    padding: 10,
     fontWeight: "bold",
     fontSize: 9,
-    borderBottom: "1 solid #ccc",
+    borderBottom: "2 solid #333",
   },
   tableRow: {
     flexDirection: "row",
-    padding: 8,
+    padding: 10,
     borderBottom: "1 solid #eee",
     fontSize: 9,
+    backgroundColor: "#fff",
   },
   colLot: {
     width: "20%",
@@ -155,6 +186,7 @@ interface ReceivingReceiptPDFProps {
   companySettings: {
     name: string
     address: string
+    logo_url?: string
   }
 }
 
@@ -236,8 +268,16 @@ export function ReceivingReceiptPDF({
       <Page size="LETTER" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <View>
+          <View style={styles.headerTop}>
+            <View style={styles.companyInfo}>
+              {companySettings.logo_url && (
+                <View style={styles.logoContainer}>
+                  <Image
+                    src={companySettings.logo_url}
+                    style={styles.logo}
+                  />
+                </View>
+              )}
               <Text style={styles.companyName}>
                 {companySettings.name || "Fresh Produce Co."}
               </Text>

@@ -137,12 +137,88 @@ export async function getLotLifecycle(lotId: string) {
           },
         },
       },
+      parentLot: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+            },
+          },
+        },
+      },
+      childLots: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
     },
   })
 
   if (!lot) {
     return null
   }
+
+  // Get production run for this lot (if it was produced from a parent)
+  let parentProductionRun = null
+  if (lot.parent_lot_id) {
+    parentProductionRun = await prisma.productionRun.findFirst({
+      where: {
+        destination_lot_id: lotId,
+        source_lot_id: lot.parent_lot_id,
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+    })
+  }
+
+  // Get production runs for child lots (if this lot was consumed)
+  const childProductionRuns = await prisma.productionRun.findMany({
+    where: {
+      source_lot_id: lotId,
+    },
+    include: {
+      destinationLot: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+            },
+          },
+        },
+      },
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+  })
 
   // Get all audit logs for this lot
   const auditTrail = await prisma.auditLog.findMany({
@@ -167,6 +243,8 @@ export async function getLotLifecycle(lotId: string) {
   return {
     lot,
     auditTrail,
+    parentProductionRun,
+    childProductionRuns,
   }
 }
 

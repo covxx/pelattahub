@@ -1,0 +1,71 @@
+---
+alwaysApply: true
+---
+# .cursorrules
+
+You are a Senior Full Stack Engineer specializing in Logistics, Supply Chain, and Warehouse Management Systems (WMS). You are building a high-performance, produce-specific WMS.
+
+# 🏗️ Tech Stack
+- **Framework:** Next.js 16 (App Router)
+- **Language:** TypeScript 5+ (Strict Mode)
+- **Database:** PostgreSQL 15+ via Prisma ORM
+- **UI:** Tailwind CSS 4 + Shadcn UI (Radix Primitives)
+- **Auth:** NextAuth.js v5 (Beta)
+- **Printing:** Raw ZPL (Browser-Native) & PDF (React-PDF)
+- **Infrastructure:** Docker & Docker Compose (Production ready)
+
+# 🧠 Core Architecture Rules
+
+1.  **Server Components Default:** All components are Server Components by default. Only add `"use client"` if using hooks (`useState`, `useEffect`) or browser-only APIs (`window`).
+2.  **Server Actions over API Routes:** Do not create `/app/api/` routes for data mutation. Use Server Actions (`/actions/*.ts`) for all CRUD operations.
+3.  **Strict Typing:** Never use `any`. Always define interfaces for Database Models (Prisma types) and Props.
+4.  **Zod Validation:** All form inputs and Server Action payloads must be validated with Zod schemas.
+
+# 🍎 Business Logic & Domain Constraints
+
+1.  **Produce Traceability (PTI):**
+    - Inventory is **Lot-Based**. We never track generic quantities; we track specific Lots.
+    - **FIFO** (First-In-First-Out) is the sorting law for picking.
+    - **GTIN** (Global Trade Item Number) is the primary barcode identifier.
+2.  **Audit Trail (CRITICAL):**
+    - **Zero Silent Writes:** Every CREATE, UPDATE, or DELETE operation in the database MUST generate a corresponding `AuditLog` entry.
+    - Log details must include: `userId`, `action`, `entityType`, `entityId`, and a JSON diff of changes.
+3.  **Multi-Unit Support:**
+    - The system must handle both **CASE** and **LBS** (Pounds).
+    - Always check `product.standard_case_weight` when converting between units.
+
+# 🖨️ Hardware & Printing Rules (STRICT)
+
+1.  **No Web Serial API:** Do NOT suggest `navigator.serial`. We have deprecated direct USB connections.
+2.  **Browser-Native ZPL:**
+    - For Labels: Use the `printZplViaBrowser(zplString)` utility.
+    - This relies on the client OS using a "Generic / Text Only" driver.
+    - ZPL strings must be wrapped in a `<pre>` tag in a popup window.
+3.  **PDF Documents:**
+    - For Receipts, BOLs, and Invoices: Use `@react-pdf/renderer`.
+    - Never try to print complex HTML tables directly; generate a PDF Blob.
+4.  **PTI Compliance:**
+    - Voice Pick Codes (4 digits) must be calculated using the CRC16 algorithm.
+    - Labels must follow the 4x2 PTI layout (Barcode Top, Voice Pick Bottom Right).
+
+# 📂 File Structure Conventions
+
+- `app/` -> Routes and Pages.
+- `components/ui/` -> Shadcn primitive components.
+- `components/rugged/` -> Large, touch-friendly components for Warehouse Kiosks.
+- `components/admin/` -> Admin-only tables and forms.
+- `actions/` -> Server Actions (grouped by domain: `inventory.ts`, `orders.ts`).
+- `lib/` -> Utilities (`zplGenerator.ts`, `voice-pick.ts`, `prisma.ts`).
+- `prisma/` -> Database schema and seed scripts.
+
+# 🐳 Docker & Deployment
+
+- The app runs in a container.
+- Database persists to `./pgdata` volume.
+- Use `output: "standalone"` in Next.js config.
+- When writing scripts, assume they run inside the container (e.g., `npx tsx scripts/script-name.ts`).
+
+# 🛡️ Security
+
+- **RBAC:** Protect all Admin routes (`/dashboard/admin`) with Middleware checks for `role === 'ADMIN'`.
+- **Validation:** Never trust client-side inputs. Re-validate Zod schemas inside Server Actions.

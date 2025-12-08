@@ -94,15 +94,34 @@ export function ProductsManagement({ products: initialProducts }: ProductsManage
   ]
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-4">
+      {/* TEST: Simple button to verify rendering */}
+      <div className="bg-red-500 text-white p-4 mb-4">
+        <button 
+          onClick={() => alert('Test button works!')}
+          className="bg-white text-red-500 px-4 py-2 rounded font-bold"
+        >
+          TEST BUTTON - CLICK ME
+        </button>
+      </div>
+      
+      <div className="flex items-center justify-between mb-4 gap-4 w-full">
         <h2 className="text-2xl font-bold">Products</h2>
-        <div className="flex gap-2">
-          <Button onClick={() => setIsAddDialogOpen(true)}>
+        <div className="flex gap-2 ml-auto">
+          <Button 
+            onClick={() => setIsAddDialogOpen(true)} 
+            className="whitespace-nowrap"
+            type="button"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Product
           </Button>
-          <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsImportModalOpen(true)} 
+            className="whitespace-nowrap"
+            type="button"
+          >
             <Upload className="h-4 w-4 mr-2" />
             Import
           </Button>

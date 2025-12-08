@@ -49,6 +49,19 @@ async function main() {
     console.log(`   ✅ ${vendor.name} (${vendor.code})`)
   }
 
+  // Initialize lot number sequence if it doesn't exist
+  console.log("\n🔢 Initializing lot number sequence...")
+  const lotSequenceSetting = await prisma.systemSetting.upsert({
+    where: { key: "next_lot_sequence" },
+    update: {}, // Don't update if it already exists
+    create: {
+      key: "next_lot_sequence",
+      value: "1",
+      description: "Next sequential number for lot number generation (8-digit format: 01 + 6 digits)",
+    },
+  })
+  console.log(`   ✅ Lot number sequence initialized to: ${lotSequenceSetting.value}`)
+
   console.log("\n✅ Database seeding completed!")
 }
 

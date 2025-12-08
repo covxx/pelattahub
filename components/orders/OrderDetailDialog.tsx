@@ -17,6 +17,7 @@ interface OrderDetailDialogProps {
   onOpenChange: (open: boolean) => void
   order: {
     id: string
+    order_number?: string | null
     po_number: string | null
     status: string
     delivery_date: Date | string
@@ -74,7 +75,7 @@ export function OrderDetailDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Order Details: #{order.order_number}
+            Order Details: #{order.order_number || order.id.slice(0, 8)}
           </DialogTitle>
           <DialogDescription>
             View order items, quantities ordered, and what was picked/shipped

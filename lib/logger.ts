@@ -52,6 +52,7 @@ export const AuditAction = {
   // Inventory
   ADJUST_QUANTITY: "ADJUST_QUANTITY",
   ADJUST_QTY: "ADJUST_QTY", // Alias for consistency
+  CONVERT_LOT: "CONVERT_LOT", // Inventory conversion/repacking
   
   // Picking
   PICK: "PICK",
@@ -66,6 +67,9 @@ export const AuditAction = {
   
   // Bulk Operations
   BULK_IMPORT: "BULK_IMPORT",
+  
+  // System Operations
+  DATABASE_RESET: "DATABASE_RESET",
   
   // Access
   LOGIN: "LOGIN",

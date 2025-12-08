@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Search, Package, Truck, Calendar, User, AlertCircle } from "lucide-react"
+import { Search, Package, Truck, Calendar, User, AlertCircle, ArrowRight, ArrowLeft, Link2 } from "lucide-react"
 import { searchTraceability, getLotLifecycle } from "@/app/actions/admin/audit"
 
 export function TraceabilityExplorer() {
@@ -426,6 +426,130 @@ export function TraceabilityExplorer() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Source Ingredient - If this lot was produced from another lot */}
+                {lotLifecycle.lot.parentLot && (
+                  <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <ArrowLeft className="h-5 w-5 text-blue-600" />
+                        Source Ingredient
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <div className="font-semibold text-base">
+                                Produced from Lot #{lotLifecycle.lot.parentLot.lot_number}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {lotLifecycle.lot.parentLot.product.name}
+                              </div>
+                              {lotLifecycle.parentProductionRun && (
+                                <>
+                                  <div className="text-xs text-muted-foreground mt-2">
+                                    <Calendar className="h-3 w-3 inline mr-1" />
+                                    {format(
+                                      new Date(lotLifecycle.parentProductionRun.created_at),
+                                      "MMM dd, yyyy 'at' HH:mm"
+                                    )}
+                                  </div>
+                                  {lotLifecycle.parentProductionRun.user && (
+                                    <div className="text-xs text-muted-foreground">
+                                      <User className="h-3 w-3 inline mr-1" />
+                                      By {lotLifecycle.parentProductionRun.user.name}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSheetOpen(false)
+                                setTimeout(() => {
+                                  handleViewLot(lotLifecycle.lot.parentLot!.id)
+                                }, 100)
+                              }}
+                              className="ml-4"
+                            >
+                              <Link2 className="h-4 w-4 mr-1" />
+                              View Parent Lot
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Downstream Products - If this lot was consumed to produce other lots */}
+                {lotLifecycle.childProductionRuns && lotLifecycle.childProductionRuns.length > 0 && (
+                  <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <ArrowRight className="h-5 w-5 text-green-600" />
+                        Downstream Products
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {lotLifecycle.childProductionRuns.map((productionRun: any) => (
+                          <div
+                            key={productionRun.id}
+                            className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-green-200"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-1 flex-1">
+                                <div className="font-semibold text-base">
+                                  Lot #{productionRun.destinationLot.lot_number}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {productionRun.destinationLot.product.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                                  <div>
+                                    <Calendar className="h-3 w-3 inline mr-1" />
+                                    {format(
+                                      new Date(productionRun.created_at),
+                                      "MMM dd, yyyy 'at' HH:mm"
+                                    )}
+                                  </div>
+                                  {productionRun.user && (
+                                    <div>
+                                      <User className="h-3 w-3 inline mr-1" />
+                                      By {productionRun.user.name}
+                                    </div>
+                                  )}
+                                  <div className="text-xs font-medium mt-1">
+                                    {productionRun.quantity_consumed} → {productionRun.quantity_produced} produced
+                                  </div>
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSheetOpen(false)
+                                  setTimeout(() => {
+                                    handleViewLot(productionRun.destinationLot.id)
+                                  }, 100)
+                                }}
+                                className="ml-4"
+                              >
+                                <Link2 className="h-4 w-4 mr-1" />
+                                View Lot
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Audit Trail */}
                 <Card>

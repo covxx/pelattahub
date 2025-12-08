@@ -32,7 +32,9 @@ services:
       - .:/app
       - /app/node_modules
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-wms_password}@db:5432/${POSTGRES_DB:-wms}?schema=public
+      # NOTE: If using existing DB container, password may be 'producebro9' instead of 'wms_password'
+      # Set POSTGRES_PASSWORD in .env to match your actual database password
+      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-producebro9}@db:5432/${POSTGRES_DB:-wms}?schema=public
     command: >
       sh -c "
         apk add --no-cache postgresql-client netcat-openbsd &&
@@ -62,14 +64,24 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # PRODUCTION MODE: No volume mounts - uses built standalone image from Dockerfile
+    # Volume mounts would overwrite the built files and cause "next: not found" errors
+    # For development with hot-reload, uncomment volumes below and change command to "npm run dev"
+    # volumes:
+    #   - ./:/app
+    #   - /app/node_modules
+    #   - /app/.next
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-wms_password}@db:5432/${POSTGRES_DB:-wms}?schema=public
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      # DATABASE_URL: Use existing container's password if DB container exists, otherwise use env var
+      # This handles the case where an existing DB container has a different password
+      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-producebro9}@db:5432/${POSTGRES_DB:-wms}?schema=public
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-$(openssl rand -base64 32)}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       AUTH_TRUST_HOST: "true"
       NEXT_PUBLIC_COMPANY_NAME: ${NEXT_PUBLIC_COMPANY_NAME:-Fresh Farm Logic LLC}
       NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-1234 Produce Lane, Salinas, CA}
       NODE_ENV: production
+    # Use production build (standalone mode) - server.js is in the built image
     depends_on:
       db:
         condition: service_healthy

@@ -52,8 +52,8 @@ interface AuditLogsTableProps {
 
 export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-  const [filterUser, setFilterUser] = useState("")
-  const [filterAction, setFilterAction] = useState("")
+  const [filterUser, setFilterUser] = useState("all")
+  const [filterAction, setFilterAction] = useState("all")
   const [filterDate, setFilterDate] = useState("")
 
   const toggleRow = (id: string) => {
@@ -68,8 +68,8 @@ export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
 
   // Filter logs
   const filteredLogs = logs.filter((log) => {
-    if (filterUser && log.user.id !== filterUser) return false
-    if (filterAction && log.action !== filterAction) return false
+    if (filterUser && filterUser !== "all" && log.user.id !== filterUser) return false
+    if (filterAction && filterAction !== "all" && log.action !== filterAction) return false
     if (filterDate) {
       const logDate = format(new Date(log.createdAt), "yyyy-MM-dd")
       if (logDate !== filterDate) return false
@@ -111,7 +111,7 @@ export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
                 <SelectValue placeholder="All users" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All users</SelectItem>
+                <SelectItem value="all">All users</SelectItem>
                 {users.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.name || user.email}
@@ -128,7 +128,7 @@ export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
                 <SelectValue placeholder="All actions" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All actions</SelectItem>
+                <SelectItem value="all">All actions</SelectItem>
                 {actions.map((action) => (
                   <SelectItem key={action} value={action}>
                     {action}

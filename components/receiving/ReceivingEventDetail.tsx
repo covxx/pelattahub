@@ -73,8 +73,14 @@ export function ReceivingEventDetail({
               }
             )
           } else {
-            // Fallback to master label
-            return generateMasterLabel(lot, lot.product)
+            // Use master pallet label (4x6)
+            const lotWithVendor = {
+              ...lot,
+              receivingEvent: event ? {
+                vendor: event.vendor
+              } : undefined
+            }
+            return generateMasterLabel(lotWithVendor, lot.product)
           }
         })
         .join('\n\n')

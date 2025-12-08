@@ -47,7 +47,7 @@ export async function getCompanySettings() {
   const settings = await prisma.systemSetting.findMany({
     where: {
       key: {
-        in: ["company_name", "company_address", "gs1_prefix"],
+        in: ["company_name", "company_address", "gs1_prefix", "company_logo_url"],
       },
     },
   })
@@ -56,12 +56,14 @@ export async function getCompanySettings() {
     name: "",
     address: "",
     gs1_prefix: "000000",
+    logo_url: "",
   }
 
   settings.forEach((setting) => {
     if (setting.key === "company_name") result.name = setting.value
     if (setting.key === "company_address") result.address = setting.value
     if (setting.key === "gs1_prefix") result.gs1_prefix = setting.value
+    if (setting.key === "company_logo_url") result.logo_url = setting.value
   })
 
   return result
@@ -75,6 +77,7 @@ export async function updateCompanySettings(data: {
   company_name?: string
   company_address?: string
   gs1_prefix?: string
+  company_logo_url?: string
 }) {
   const session = await requireAdminOrManager()
 
@@ -260,18 +263,37 @@ export async function resetDatabase(): Promise<{
     ])
 
     // Perform deletion in transaction
-    // Order matters due to foreign key constraints
+    // Order matters due to foreign key constraints (Restrict/Cascade)
+    // Delete child tables first, respecting Restrict constraints
     await prisma.$transaction(async (tx) => {
-      // Delete in order: child tables first, then parent tables
+      // 1. Delete OrderPick (references OrderItem, InventoryLot - both will be deleted)
       await tx.orderPick.deleteMany({})
+      
+      // 2. Delete OrderAllocation (references OrderItem, InventoryLot)
       await tx.orderAllocation.deleteMany({})
+      
+      // 3. Delete OrderItem (must be deleted before Product due to Restrict constraint)
       await tx.orderItem.deleteMany({})
+      
+      // 4. Delete Order (must be deleted before Customer due to Restrict constraint)
       await tx.order.deleteMany({})
+      
+      // 5. Delete InventoryLot (references Product with Cascade, ReceivingEvent with SetNull)
       await tx.inventoryLot.deleteMany({})
+      
+      // 6. Delete ReceivingEvent (must be deleted before Vendor due to Restrict constraint)
       await tx.receivingEvent.deleteMany({})
+      
+      // 7. Delete Product (no blocking constraints after OrderItem is deleted)
       await tx.product.deleteMany({})
+      
+      // 8. Delete Customer (no blocking constraints after Order is deleted)
       await tx.customer.deleteMany({})
+      
+      // 9. Delete Vendor (no blocking constraints after ReceivingEvent is deleted)
       await tx.vendor.deleteMany({})
+      
+      // NOTE: User table, AuditLog, SystemSetting, and IntegrationSettings are NOT deleted
     })
 
     // Log the reset event AFTER deletion (re-create audit log)

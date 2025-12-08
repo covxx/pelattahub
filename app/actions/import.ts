@@ -341,13 +341,13 @@ export async function commitImport(
             // Update existing product
             await tx.product.update({
               where: { id: record.existingId },
-              data: record.data,
+              data: record.data as any,
             })
             updated++
           } else {
             // Create new product
             await tx.product.create({
-              data: record.data,
+              data: record.data as any,
             })
             created++
           }
@@ -356,13 +356,13 @@ export async function commitImport(
             // Update existing customer
             await tx.customer.update({
               where: { id: record.existingId },
-              data: record.data,
+              data: record.data as any,
             })
             updated++
           } else {
             // Create new customer
             await tx.customer.create({
-              data: record.data,
+              data: record.data as any,
             })
             created++
           }
@@ -371,13 +371,13 @@ export async function commitImport(
             // Update existing vendor
             await tx.vendor.update({
               where: { id: record.existingId },
-              data: record.data,
+              data: record.data as any,
             })
             updated++
           } else {
             // Create new vendor
             await tx.vendor.create({
-              data: record.data,
+              data: record.data as any,
             })
             created++
           }

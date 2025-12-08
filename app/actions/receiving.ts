@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { unstable_noStore as noStore } from "next/cache"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
+import { getNextLotNumber } from "@/lib/lot-number"
 
 interface BatchReceivingItem {
   productId: string
@@ -24,11 +25,30 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
     throw new Error("Unauthorized")
   }
 
+  if (!session.user.id) {
+    throw new Error("Invalid session: User ID is missing. Please log out and log in again.")
+  }
+
   if (session.user.role !== "ADMIN" && session.user.role !== "RECEIVER" && session.user.role !== "MANAGER") {
     throw new Error("Insufficient permissions")
   }
 
   try {
+    // Verify user exists in database before proceeding
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, email: true },
+    })
+
+    if (!user) {
+      console.error(
+        `[Receiving] User not found in database. Session user ID: ${session.user.id}, Email: ${session.user.email}`
+      )
+      throw new Error(
+        `User not found in database. Please log out and log in again. (User ID: ${session.user.id})`
+      )
+    }
+
     // Use transaction to ensure all-or-nothing behavior
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create the ReceivingEvent
@@ -77,10 +97,8 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
           throw new Error(`Product ${product.name} is missing GTIN`)
         }
 
-        // Generate lot number: Format YYYYMMDD-{VendorCode}-{ProductSKU}-RAND
-        const dateStr = input.date.toISOString().split("T")[0].replace(/-/g, "")
-        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
-        const lotNumber = `${dateStr}-${receivingEvent.vendor.code}-${product.sku}-${randomSuffix}`
+        // Generate sequential lot number: Format 01 + 6-digit sequence (e.g., 01000001)
+        const lotNumber = await getNextLotNumber(tx)
 
         // Calculate expiry date (10 days from received date for produce)
         const expiryDate = new Date(input.date)

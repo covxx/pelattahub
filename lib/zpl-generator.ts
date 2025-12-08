@@ -264,7 +264,7 @@ export function generateCaseLabel(
 ^FO20,155^FDLOT: ${safeLotNumber}^FS
 ^FO20,190^FDPACK: ${packDateDisplay}^FS
 
-^FO550,110^GB230,120,3^FS
+^FO550,110^GB230,120,120^FS
 ^CF0,30
 ^FO620,120^FR^FD${voicePickTop}^FS
 ^CF0,70
@@ -278,11 +278,11 @@ export function generateCaseLabel(
 }
 
 /**
- * Generates a Master Pallet Label - Generic "License Plate"
+ * Generates a Master Pallet Label - 4x6 inches
  * Label size: 4x6 inches (812 dots x 1218 dots at 203 DPI)
- * Purpose: Generic pallet identifier - no quantity
+ * Shows: Vendor, Total Amount, Received Date, Product, Lot Number
  * 
- * @param lot - Inventory lot data
+ * @param lot - Inventory lot data (must include receivingEvent with vendor)
  * @param product - Product data
  * @returns ZPL string
  */
@@ -290,21 +290,42 @@ export function generateMasterLabel(
   lot: {
     lot_number: string
     received_date: Date | string
+    original_quantity?: number
+    quantity_current?: number
+    receivingEvent?: {
+      vendor?: {
+        name: string
+        code?: string
+      }
+    }
   },
   product: {
     name: string
+    unit_type?: string
   }
 ): string {
   const lotNumber = lot.lot_number
   const productName = product.name
   const receivedDate = new Date(lot.received_date)
   const receivedDateDisplay = formatDateMMDDYYYY(receivedDate)
+  
+  // Get quantity (prefer original_quantity, fallback to quantity_current)
+  const totalQuantity = lot.original_quantity ?? lot.quantity_current ?? 0
+  const unitType = product.unit_type || "CASE"
+  const quantityDisplay = `${totalQuantity} ${unitType}`
+  
+  // Get vendor name
+  const vendorName = lot.receivingEvent?.vendor?.name || "Unknown Vendor"
+  const vendorCode = lot.receivingEvent?.vendor?.code || ""
 
   // Escape text for ZPL
   const safeProductName = escapeZPL(productName)
   const safeLotNumber = escapeZPL(lotNumber)
+  const safeVendorName = escapeZPL(vendorName)
+  const safeVendorCode = escapeZPL(vendorCode)
+  const safeQuantityDisplay = escapeZPL(quantityDisplay)
 
-  // ZPL Commands for 4x6 label (Master Pallet Tag - Generic)
+  // ZPL Commands for 4x6 label (Master Pallet Label)
   const zpl = `^XA
 ^PW812
 ^LL1218
@@ -331,15 +352,23 @@ export function generateMasterLabel(
 ^LL1218
 ^LS0
 
-^FO0,30^GB812,80,80^FS
-^FO30,50^A0N,50,50^FR^FDMASTER PALLET TAG^FS
+^FO0,30^GB812,100,100^FS
+^FO30,60^A0N,60,60^FR^FDPALLET LABEL^FS
 
-^FO50,200^A0N,60,60^FD${safeProductName}^FS
+^CF0,50
+^FO50,180^FD${safeProductName}^FS
 
-^BY4,3,200^FT50,600^BCN,,N,N^FD${safeLotNumber}^FS
+^CF0,35
+^FO50,280^FDVendor: ${safeVendorName}^FS
 
-^FO50,950^A0N,45,45^FDLot: ${safeLotNumber}^FS
-^FO50,1020^A0N,35,35^FDReceived: ${receivedDateDisplay}^FS
+^CF0,40
+^FO50,420^FDTotal: ${safeQuantityDisplay}^FS
+
+^CF0,35
+^FO50,500^FDReceived: ${receivedDateDisplay}^FS
+
+^CF0,30
+^FO50,600^FDLot Number: ${safeLotNumber}^FS
 
 ^XZ`
 
@@ -402,16 +431,22 @@ export function generatePTILabel(
   const safeProductName = escapeZPL(productName)
   const safeLotNumber = escapeZPL(lotNumber)
   const safeCompanyName = escapeZPL(companySettings.name)
-  const safeCompanyAddress = escapeZPL(companySettings.address)
+  // Handle multi-line addresses (split on \n or actual newlines)
+  const addressLines = companySettings.address.split(/\n|\\n/).filter(line => line.trim())
+  const safeAddressLines = addressLines.map(line => escapeZPL(line.trim()))
   const safeOrigin = escapeZPL(options?.origin || "USA")
 
   // Auto-scale product name if too long
-  let productFontHeight = 55
-  let productFontWidth = 55
+  let productFontHeight = 38
+  let productFontWidth = 38
   
-  if (productName.length > 20) {
-    productFontHeight = 45
-    productFontWidth = 45
+  if (productName.length > 18) {
+    productFontHeight = 32
+    productFontWidth = 32
+  }
+  if (productName.length > 25) {
+    productFontHeight = 28
+    productFontWidth = 28
   }
 
   // Construct GS1-128 barcode data with HRI
@@ -453,32 +488,24 @@ export function generatePTILabel(
 ^LL406
 ^LS0
 
-^BY2,3,80^FT30,100^BCN,,N,N^FD${barcodeData}^FS
-^CF0,16
-^FO30,105^FD${barcodeHRI}^FS
+^BY2,3,70^FT200,90^BCN,,N,N^FD${barcodeData}^FS
+^CF0,14
+^FO0,95^FB812,1,0,C,0^FD${barcodeHRI}^FS
 
 ^CF0,${productFontHeight},${productFontWidth}
-^FO0,140^FB812,1,0,C,0^FD${safeProductName}\\&^FS
+^FO0,130^FB812,1,0,C,0^FD${safeProductName}\\&^FS
 
-^FO600,140^GB180,70,3^FS
-^CF0,14
-^FO610,145^FDPACK DATE^FS
-^CF0,28
-^FO620,165^FD${packDateDisplay}^FS
-
-^CF0,20
-^FO20,240^FDPack/Weight: ${caseWeightDisplay}^FS
-^FO20,265^FDProduct of ${safeOrigin}^FS
 ^CF0,18
-^FO20,295^FD${safeCompanyName}^FS
-^CF0,14
-^FO20,315^FD${safeCompanyAddress}^FS
+^FO20,220^FDProduct of ${safeOrigin}^FS
+^FO20,245^FDPack/Weight: ${caseWeightDisplay}^FS
+^FO20,270^FD${safeCompanyName}^FS
+${safeAddressLines.map((line, index) => `^FO20,${295 + (index * 20)}^FD${line}^FS`).join('\n')}
 
-^FO600,250^GB180,140,4^FS
-^CF0,32
-^FO640,260^FR^FD${small}^FS
-^CF0,90
-^FO615,300^FR^FD${large}^FS
+^FO600,230^GB180,130,130^FS
+^CF0,28
+^FO640,240^FR^FD${small}^FS
+^CF0,80
+^FO615,275^FR^FD${large}^FS
 
 ^XZ`
 

@@ -54,8 +54,26 @@ const receivingSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1, "Product is required"),
-        quantity: z.number().min(0.01, "Quantity must be greater than 0"),
+        quantity: z.number({ message: "Amount must be a valid number" }).min(0.01, "Amount must be greater than 0"),
         unitType: z.enum(["CASE", "LBS", "EACH"]),
+      }).superRefine((data, ctx) => {
+        if (data.unitType === "CASE" || data.unitType === "EACH") {
+          if (!Number.isInteger(data.quantity) || data.quantity < 1) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Amount must be a whole number (1 or greater)",
+              path: ["quantity"]
+            })
+          }
+        } else {
+          if (data.quantity < 0.01) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Amount must be greater than 0",
+              path: ["quantity"]
+            })
+          }
+        }
       })
     )
     .min(1, "At least one item is required"),
@@ -233,23 +251,15 @@ export function BatchReceivingForm({
 
   const handlePrintMaster = (lot: any) => {
     try {
-      // Use PTI label if company settings are loaded
-      let zpl
-      if (companySettings) {
-        zpl = generatePTILabel(
-          lot,
-          lot.product,
-          companySettings,
-          {
-            caseWeight: lot.product.standard_case_weight,
-            unitType: lot.product.unit_type,
-            origin: lot.origin_country,
-          }
-        )
-      } else {
-        // Fallback to master label
-        zpl = generateMasterLabel(lot, lot.product)
+      // Use master pallet label (4x6) - always use master label for pallets
+      // Ensure lot has receivingEvent with vendor
+      const lotWithVendor = {
+        ...lot,
+        receivingEvent: receivingEvent ? {
+          vendor: receivingEvent.vendor
+        } : undefined
       }
+      const zpl = generateMasterLabel(lotWithVendor, lot.product)
       
       printZplViaBrowser(zpl, { windowTitle: `Label - ${lot.lot_number}` })
       
@@ -627,18 +637,33 @@ export function BatchReceivingForm({
                               <FormControl>
                                 <Input
                                   type="number"
-                                  min="0.01"
+                                  min={currentUnitType === "CASE" || currentUnitType === "EACH" ? "1" : "0.01"}
                                   step={currentUnitType === "LBS" ? "0.01" : "1"}
                                   placeholder="0"
                                   className="text-3xl h-16 text-center font-bold border-2"
-                                  value={field.value}
+                                  value={field.value ?? ""}
                                   onChange={(e) => {
-                                    const value = parseFloat(e.target.value)
-                                    if (!isNaN(value)) {
+                                    const inputValue = e.target.value
+                                    if (inputValue === "" || inputValue === null) {
+                                      field.onChange(undefined as any)
+                                      return
+                                    }
+                                    const value = parseFloat(inputValue)
+                                    if (!isNaN(value) && value >= 0) {
                                       if (currentUnitType === "CASE" || currentUnitType === "EACH") {
-                                        field.onChange(Math.round(value))
+                                        field.onChange(Math.max(1, Math.round(value)))
                                       } else {
-                                        field.onChange(Math.round(value * 100) / 100)
+                                        field.onChange(Math.max(0.01, Math.round(value * 100) / 100))
+                                      }
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const value = parseFloat(e.target.value)
+                                    if (isNaN(value) || value <= 0) {
+                                      if (currentUnitType === "CASE" || currentUnitType === "EACH") {
+                                        field.onChange(1)
+                                      } else {
+                                        field.onChange(0.01)
                                       }
                                     }
                                   }}

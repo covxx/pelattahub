@@ -16,6 +16,9 @@ import {
   Link2,
   Activity,
   Hand,
+  Cog,
+  Factory,
+  BarChart3,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -51,6 +54,18 @@ const navigation = [
     href: "/dashboard/picking",
     icon: Hand,
     roles: ["ADMIN", "PACKER", "MANAGER"],
+  },
+  {
+    name: "Production",
+    href: "/dashboard/production",
+    icon: Factory,
+    roles: ["ADMIN", "RECEIVER", "PACKER", "MANAGER"],
+  },
+  {
+    name: "Reports",
+    href: "/dashboard/reports",
+    icon: BarChart3,
+    roles: ["ADMIN", "RECEIVER", "PACKER", "MANAGER"],
   },
   {
     name: "Users",
@@ -102,14 +117,23 @@ const adminNavigation = [
 export function DashboardNav({ user }: DashboardNavProps) {
   const pathname = usePathname()
 
-  // Filter navigation items based on user role
-  const filteredNav = navigation.filter((item) =>
-    item.roles.includes(user.role || "")
-  )
+  // Filter navigation items based on user role (case-insensitive)
+  // Reports should be visible to all authenticated users
+  const filteredNav = navigation.filter((item) => {
+    // Always show Reports if user is authenticated (reports action only requires auth)
+    if (item.name === "Reports" && user.role) {
+      return true
+    }
+    if (!user.role) return false
+    const userRole = user.role.toUpperCase()
+    return item.roles.some((role) => role.toUpperCase() === userRole)
+  })
   
-  const filteredAdminNav = adminNavigation.filter((item) =>
-    item.roles.includes(user.role || "")
-  )
+  const filteredAdminNav = adminNavigation.filter((item) => {
+    if (!user.role) return false
+    const userRole = user.role.toUpperCase()
+    return item.roles.some((role) => role.toUpperCase() === userRole)
+  })
 
   return (
     <>
@@ -135,7 +159,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
               <li>
                 <ul role="list" className="-mx-2 space-y-1">
                   {filteredNav.map((item) => {
-                    const isActive = pathname === item.href
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
                     return (
                       <li key={item.name}>
                         <Link

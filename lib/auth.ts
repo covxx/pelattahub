@@ -20,43 +20,60 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         try {
           if (!credentials?.email || !credentials?.password) {
-            console.log("[Auth] Missing email or password")
+            if (process.env.NODE_ENV === "development") {
+              console.log("[Auth] Missing email or password")
+            }
             return null
           }
 
-          console.log("[Auth] Looking up user:", credentials.email)
+          const email = (credentials.email as string).toLowerCase().trim()
+          const password = credentials.password as string
+
+          // Database connection check
+          try {
+            await prisma.$connect()
+          } catch (dbError) {
+            console.error("[Auth] Database connection failed:", dbError)
+            throw new Error("Database connection failed. Please check your database configuration.")
+          }
+
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Auth] Looking up user:", email)
+          }
           
           const user = await prisma.user.findUnique({
-            where: { email: credentials.email as string },
+            where: { email },
           })
 
           if (!user) {
-            console.log("[Auth] User not found")
+            if (process.env.NODE_ENV === "development") {
+              console.log("[Auth] User not found:", email)
+            }
             return null
           }
 
           if (!user.password) {
-            console.log("[Auth] User has no password")
+            console.error("[Auth] User has no password set:", email)
             return null
           }
 
-          console.log("[Auth] Comparing passwords")
-          console.log("[Auth] Input password length:", (credentials.password as string).length)
-          console.log("[Auth] Stored hash:", user.password.substring(0, 30) + "...")
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Auth] Comparing passwords for:", email)
+          }
           
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password as string,
-            user.password
-          )
+          const isPasswordValid = await bcrypt.compare(password, user.password)
 
-          console.log("[Auth] Comparison result:", isPasswordValid)
-          
           if (!isPasswordValid) {
-            console.log("[Auth] Password invalid")
+            if (process.env.NODE_ENV === "development") {
+              console.log("[Auth] Password invalid for:", email)
+            }
             return null
           }
 
-          console.log("[Auth] Login successful for:", user.email)
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Auth] Login successful for:", user.email)
+          }
+
           return {
             id: user.id,
             email: user.email,
@@ -65,6 +82,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
         } catch (error) {
           console.error("[Auth] Error during authorization:", error)
+          // Don't expose internal errors to users
           return null
         }
       },
@@ -86,5 +104,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
   },
-  debug: true,
+  debug: process.env.NODE_ENV === "development",
 })

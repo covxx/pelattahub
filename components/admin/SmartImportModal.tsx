@@ -68,7 +68,7 @@ export function SmartImportModal({ open, onOpenChange, type }: SmartImportModalP
           const data = new Uint8Array(e.target?.result as ArrayBuffer)
           const workbook = XLSX.read(data, { type: "array" })
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet)
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet) as Array<Record<string, any>>
           resolve(jsonData)
         } catch (error) {
           reject(error)
