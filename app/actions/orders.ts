@@ -178,6 +178,7 @@ export async function allocateOrder(orderId: string) {
     // Use transaction to ensure all-or-nothing allocation
     const result = await prisma.$transaction(async (tx) => {
       const allocationResults = []
+      const shortages: Array<{ product: string; sku: string; requested: number; allocated: number }> = []
 
       // Loop through each order item
       for (const item of order.items) {
@@ -200,9 +201,13 @@ export async function allocateOrder(orderId: string) {
         })
 
         if (availableLots.length === 0) {
-          throw new Error(
-            `No available inventory for product ${item.product.name} (${item.product.sku})`
-          )
+          shortages.push({
+            product: item.product.name,
+            sku: item.product.sku,
+            requested: item.quantity_ordered,
+            allocated: 0,
+          })
+          continue // allow order to move forward without allocations
         }
 
         // Allocate from lots using FIFO
@@ -231,12 +236,14 @@ export async function allocateOrder(orderId: string) {
           remainingQuantity -= quantityToAllocate
         }
 
-        // Check if we couldn't fulfill the full quantity
+        // If we couldn't fulfill the full quantity, record shortage but do not block
         if (remainingQuantity > 0) {
-          throw new Error(
-            `Insufficient inventory for ${item.product.name} (${item.product.sku}). ` +
-              `Requested: ${item.quantity_ordered}, Available: ${item.quantity_ordered - remainingQuantity}`
-          )
+          shortages.push({
+            product: item.product.name,
+            sku: item.product.sku,
+            requested: item.quantity_ordered,
+            allocated: item.quantity_ordered - remainingQuantity,
+          })
         }
       }
 
@@ -245,6 +252,7 @@ export async function allocateOrder(orderId: string) {
         where: { id: orderId },
         data: {
           status: OrderStatus.CONFIRMED,
+          // Optionally, we could store shortage info in metadata if desired later
         },
         include: {
           customer: true,
@@ -266,7 +274,7 @@ export async function allocateOrder(orderId: string) {
         },
       })
 
-      return { order: updatedOrder, allocations: allocationResults }
+      return { order: updatedOrder, allocations: allocationResults, shortages }
     })
 
     // Log activity
@@ -279,6 +287,7 @@ export async function allocateOrder(orderId: string) {
         summary: `Allocated order ${order.id} using FIFO`,
         customer_name: order.customer.name,
         allocation_count: result.allocations.length,
+        shortages: result.shortages?.length ? result.shortages : undefined,
       }
     )
 

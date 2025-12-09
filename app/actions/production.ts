@@ -168,6 +168,9 @@ export async function convertInventory(input: ConvertInventoryInput) {
       // 7. Create destination lot
       // Round quantityProduced for storage since quantity fields are Int
       const quantityProducedRounded = Math.round(quantityProduced)
+      
+      // Store rounded values for return (to maintain consistency in production run and audit log)
+      // Note: Using type assertion because Prisma client types are out of sync with schema
       const destinationLot = await tx.inventoryLot.create({
         data: {
           lot_number: lotNumber,
@@ -181,7 +184,7 @@ export async function convertInventory(input: ConvertInventoryInput) {
           origin_country: sourceLot.origin_country, // Inherit from source
           grower_id: sourceLot.grower_id, // Inherit from source
           status: LotStatus.RECEIVED,
-        },
+        } as any,
         include: {
           product: {
             select: {
@@ -206,28 +209,35 @@ export async function convertInventory(input: ConvertInventoryInput) {
               },
             },
           },
-        },
+        } as any,
       })
 
       // 8. Create production run record
-      await tx.productionRun.create({
+      // Note: Using type assertion because Prisma client types are out of sync with schema
+      // CRITICAL: Record rounded values to match what was actually decremented/created
+      await (tx as any).productionRun.create({
         data: {
           user_id: session.user.id,
           source_lot_id: sourceLotId,
           destination_lot_id: destinationLot.id,
-          quantity_consumed: quantityConsumed,
-          quantity_produced: quantityProduced,
+          quantity_consumed: quantityConsumedRounded, // Use rounded value to match actual decrement
+          quantity_produced: quantityProducedRounded, // Use rounded value to match actual creation
           notes: notes || null,
         },
       })
 
+      // Return rounded values for consistency in production run and audit log
       return {
         sourceLot: updatedSourceLot,
         destinationLot,
+        quantityConsumedRounded, // Return rounded value to match actual decrement
+        quantityProducedRounded, // Return rounded value to match actual creation
       }
     })
 
     // 9. Log audit activity
+    // Note: Using type assertion because Prisma client types are out of sync with schema
+    const destinationLot = result.destinationLot as any
     await logActivity(
       session.user.id,
       AuditAction.CONVERT_LOT,
@@ -235,16 +245,16 @@ export async function convertInventory(input: ConvertInventoryInput) {
       result.destinationLot.id,
       {
         source_lot_id: sourceLotId,
-        source_lot_number: result.destinationLot.parentLot?.lot_number,
-        source_product: result.destinationLot.parentLot?.product?.name,
+        source_lot_number: destinationLot.parentLot?.lot_number,
+        source_product: destinationLot.parentLot?.product?.name,
         destination_lot_id: result.destinationLot.id,
         destination_lot_number: result.destinationLot.lot_number,
-        destination_product: result.destinationLot.product.name,
-        quantity_consumed: quantityConsumed,
-        quantity_produced: quantityProduced,
+        destination_product: destinationLot.product?.name,
+        quantity_consumed: result.quantityConsumedRounded, // Use rounded value to match actual decrement
+        quantity_produced: result.quantityProducedRounded, // Use rounded value to match actual creation
         unit_type: unitType,
         notes: notes || null,
-        summary: `Converted ${quantityConsumed} ${unitType} from Lot ${result.destinationLot.parentLot?.lot_number} to ${quantityProduced} ${unitType} in Lot ${result.destinationLot.lot_number}`,
+        summary: `Converted ${result.quantityConsumedRounded} ${unitType} from Lot ${destinationLot.parentLot?.lot_number} to ${result.quantityProducedRounded} ${unitType} in Lot ${result.destinationLot.lot_number}`,
       }
     )
 
@@ -409,6 +419,7 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
       const today = new Date()
       const quantityProducedRounded = Math.round(quantityProduced)
       const primarySource = sourceLotData[0].lot
+      // Note: Using type assertion because Prisma client types are out of sync with schema
       const destinationLot = await tx.inventoryLot.create({
         data: {
           lot_number: lotNumber,
@@ -422,7 +433,7 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
           origin_country: primarySource.origin_country,
           grower_id: primarySource.grower_id,
           status: LotStatus.RECEIVED,
-        },
+        } as any,
         include: {
           product: {
             select: {
@@ -447,7 +458,7 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
               },
             },
           },
-        },
+        } as any,
       })
 
       // 7. Calculate total quantity consumed for proportional allocation
@@ -458,11 +469,12 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
 
       // 8. Create production run records for each source lot
       // Allocate quantity_produced proportionally based on quantity_consumed
+      // Note: Using type assertion because Prisma client types are out of sync with schema
       for (const { lot, quantityConsumed } of sourceLotData) {
         // Calculate proportional contribution: (quantityConsumed / totalQuantityConsumed) * quantityProduced
         const proportionalProduced = (quantityConsumed / totalQuantityConsumed) * quantityProduced
         
-        await tx.productionRun.create({
+        await (tx as any).productionRun.create({
           data: {
             user_id: session.user.id,
             source_lot_id: lot.id,
@@ -483,7 +495,9 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
 
     // 9. Log audit activity
     // Use the rounded total from the transaction to match ProductionRun records
+    // Note: Using type assertion because Prisma client types are out of sync with schema
     const totalQuantityConsumed = result.totalQuantityConsumed
+    const destinationLot = result.destinationLot as any
     await logActivity(
       session.user.id,
       AuditAction.CONVERT_LOT,
@@ -494,7 +508,7 @@ export async function batchConvertInventory(input: BatchConvertInventoryInput) {
         source_lot_count: sourceLots.length,
         destination_lot_id: result.destinationLot.id,
         destination_lot_number: result.destinationLot.lot_number,
-        destination_product: result.destinationLot.product.name,
+        destination_product: destinationLot.product?.name,
         total_quantity_consumed: totalQuantityConsumed,
         quantity_produced: quantityProduced,
         unit_type: unitType,

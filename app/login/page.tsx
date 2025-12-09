@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -86,18 +87,29 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={isPending}>
               {isPending ? "Signing in..." : "Sign In"}
             </Button>
+
+            <div className="text-center">
+              <Link
+                href="/login/forgot-password"
+                className="text-sm text-blue-600 hover:underline dark:text-blue-300"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </form>
 
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded text-sm dark:bg-blue-950 dark:border-blue-800">
-            <p className="font-semibold text-blue-900 dark:text-blue-200 mb-1">
-              Default Credentials:
-            </p>
-            <p className="text-blue-800 dark:text-blue-300">
-              Email: admin@example.com
-              <br />
-              Password: admin123
-            </p>
-          </div>
+          {process.env.NODE_ENV === "development" && (
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded text-sm dark:bg-blue-950 dark:border-blue-800">
+              <p className="font-semibold text-blue-900 dark:text-blue-200 mb-1">
+                Default Credentials:
+              </p>
+              <p className="text-blue-800 dark:text-blue-300">
+                Email: admin@example.com
+                <br />
+                Password: admin123
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

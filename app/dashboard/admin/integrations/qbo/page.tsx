@@ -1,9 +1,13 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { Suspense } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { QboSyncDashboard } from "@/components/integrations/QboSyncDashboard"
 import { getQboStatus } from "@/app/actions/qbo-sync"
+
+// Force dynamic rendering to handle OAuth callback query params
+export const dynamic = 'force-dynamic'
 
 export default async function QuickBooksOnlinePage() {
   const session = await auth()
@@ -25,7 +29,7 @@ export default async function QuickBooksOnlinePage() {
       <div>
         <h1 className="text-3xl font-bold">QuickBooks Online Integration</h1>
         <p className="text-muted-foreground">
-          Sync customers and products from QuickBooks Online
+          Sync customers, products, vendors, and invoices from QuickBooks Online
         </p>
       </div>
 

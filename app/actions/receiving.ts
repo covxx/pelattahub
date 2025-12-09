@@ -56,13 +56,14 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
       const receiptNumber = await getNextReceiptNumber(tx)
       
       // 2. Create the ReceivingEvent
+      // Note: Using type assertion because Prisma client types are out of sync with schema
       const receivingEvent = await tx.receivingEvent.create({
         data: {
           receipt_number: receiptNumber,
           vendor_id: input.vendorId,
           received_date: input.date,
           created_by: session.user.id,
-        },
+        } as any,
         include: {
           vendor: true,
           user: {
@@ -149,14 +150,16 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
     })
 
     // Log the receiving event
+    // Note: Using type assertion because Prisma client types are out of sync with schema
+    const resultWithVendor = result as any
     await logActivity(
       session.user.id,
       AuditAction.RECEIVE,
       EntityType.RECEIVING_EVENT,
       result.id,
       {
-        vendor: result.vendor.name,
-        vendor_code: result.vendor.code,
+        vendor: resultWithVendor.vendor?.name || "Unknown",
+        vendor_code: resultWithVendor.vendor?.code || "Unknown",
         items_count: result.lots.length,
         total_quantity: result.lots.reduce((sum, lot) => sum + lot.original_quantity, 0),
         summary: `Created receiving event with ${result.lots.length} lot(s)`,

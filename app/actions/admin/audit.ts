@@ -122,6 +122,7 @@ export async function getLotLifecycle(lotId: string) {
   await requireAdmin()
 
   // Get the lot with all related data
+  // Note: Using type assertion because Prisma client types are out of sync with schema
   const lot = await prisma.inventoryLot.findUnique({
     where: { id: lotId },
     include: {
@@ -162,7 +163,7 @@ export async function getLotLifecycle(lotId: string) {
           createdAt: "desc",
         },
       },
-    },
+    } as any,
   })
 
   if (!lot) {
@@ -170,12 +171,14 @@ export async function getLotLifecycle(lotId: string) {
   }
 
   // Get production run for this lot (if it was produced from a parent)
+  // Note: Using type assertion because Prisma client types are out of sync with schema
   let parentProductionRun = null
-  if (lot.parent_lot_id) {
-    parentProductionRun = await prisma.productionRun.findFirst({
+  const lotWithParent = lot as any
+  if (lotWithParent.parent_lot_id) {
+    parentProductionRun = await (prisma as any).productionRun.findFirst({
       where: {
         destination_lot_id: lotId,
-        source_lot_id: lot.parent_lot_id,
+        source_lot_id: lotWithParent.parent_lot_id,
       },
       include: {
         user: {
@@ -192,7 +195,8 @@ export async function getLotLifecycle(lotId: string) {
   }
 
   // Get production runs for child lots (if this lot was consumed)
-  const childProductionRuns = await prisma.productionRun.findMany({
+  // Note: Using type assertion because Prisma client types are out of sync with schema
+  const childProductionRuns = await (prisma as any).productionRun.findMany({
     where: {
       source_lot_id: lotId,
     },

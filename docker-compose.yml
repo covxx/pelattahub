@@ -80,6 +80,11 @@ services:
       AUTH_TRUST_HOST: "true"
       NEXT_PUBLIC_COMPANY_NAME: ${NEXT_PUBLIC_COMPANY_NAME:-Fresh Farm Logic LLC}
       NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-1234 Produce Lane, Salinas, CA}
+      # QuickBooks Online Integration
+      QBO_CLIENT_ID: ${QBO_CLIENT_ID}
+      QBO_CLIENT_SECRET: ${QBO_CLIENT_SECRET}
+      QBO_REDIRECT_URI: ${QBO_REDIRECT_URI:-http://localhost:3000/api/auth/qbo/callback}
+      QBO_ENVIRONMENT: ${QBO_ENVIRONMENT:-sandbox}
       NODE_ENV: production
     # Use production build (standalone mode) - server.js is in the built image
     depends_on:

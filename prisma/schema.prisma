@@ -70,6 +70,7 @@ model User {
   orders           Order[]
   orderPicks       OrderPick[]
   productionRuns   ProductionRun[]
+  passwordResetTokens PasswordResetToken[]
   
   @@map("users")
 }
@@ -116,18 +117,37 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+// Password reset tokens (hashed at rest)
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @db.Text
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
 // Vendor Model
 model Vendor {
   id              String           @id @default(uuid()) @db.Uuid
   name            String
   code            String           @unique // e.g., "SYSCO", "LOCAL"
   active          Boolean          @default(true)
+  qbo_id          String?          // QuickBooks Online Vendor ID
+  qbo_sync_token  String?          // QBO SyncToken for optimistic locking
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   
   // Relations
   receivingEvents ReceivingEvent[]
   
+  @@index([qbo_id])
   @@map("vendors")
 }
 
@@ -286,6 +306,8 @@ model Order {
   status        OrderStatus  @default(DRAFT)
   created_by    String
   user          User         @relation(fields: [created_by], references: [id], onDelete: Restrict)
+  qbo_id        String?      // QuickBooks Online Invoice ID
+  qbo_sync_token String?     // QBO SyncToken for optimistic locking
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   
@@ -297,6 +319,7 @@ model Order {
   @@index([delivery_date])
   @@index([created_by])
   @@index([order_number])
+  @@index([qbo_id])
   @@map("orders")
 }
 
@@ -308,6 +331,7 @@ model OrderItem {
   product_id      String
   product         Product          @relation(fields: [product_id], references: [id], onDelete: Restrict)
   quantity_ordered Int
+  unit_price      Float?           // Unit price from QBO invoice
   
   // Relations
   allocations     OrderAllocation[]
@@ -358,15 +382,17 @@ model OrderPick {
 
 // Integration Settings Model - Stores OAuth tokens and integration config
 model IntegrationSettings {
-  id            String   @id @default(uuid()) @db.Uuid
-  provider      String   @unique // e.g., "quickbooks_online"
-  access_token  String   @db.Text // Encrypted access token
-  refresh_token String?  @db.Text // Encrypted refresh token
-  expires_at    DateTime? // Token expiration timestamp
-  realm_id      String?  // QBO Company ID (realm)
-  metadata      Json?    // Additional provider-specific data
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                        String   @id @default(uuid()) @db.Uuid
+  provider                  String   @unique // e.g., "qbo" (singleton for QBO)
+  access_token              String   @db.Text // Access token
+  refresh_token             String?  @db.Text // Refresh token (CRITICAL for offline access)
+  token_expires_at          DateTime? // Access token expiration timestamp
+  refresh_token_expires_at  DateTime? // Refresh token expiration timestamp
+  realm_id                  String?  // QBO Company ID (realm)
+  is_connected              Boolean  @default(false) // Connection status
+  metadata                  Json?    // Additional provider-specific data (e.g., company name)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
   
   @@map("integration_settings")
 }
