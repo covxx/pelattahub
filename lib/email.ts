@@ -63,3 +63,5 @@ export const sendEmail = async (payload: EmailPayload) => {
 
   await transporter.sendMail(message)
 }
+
+

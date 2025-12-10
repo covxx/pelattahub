@@ -1,60 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  db:
-    image: postgres:15-alpine
-    container_name: wms-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-wms}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wms_password}
-      POSTGRES_DB: ${POSTGRES_DB:-wms}
-    volumes:
-      # IMPORTANT: Local directory mapping for data persistence
-      - ./pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wms}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - wms-network
-
-  # Prisma Migration Init Container
-  prisma-migrate:
-    image: node:20-alpine
-    container_name: wms-prisma-migrate
-    working_dir: /app
-    volumes:
-      - .:/app
-      - /app/node_modules
-    environment:
-      # NOTE: If using existing DB container, password may be 'producebro9' instead of 'wms_password'
-      # Set POSTGRES_PASSWORD in .env to match your actual database password
-      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-producebro9}@db:5432/${POSTGRES_DB:-wms}?schema=public
-    command: >
-      sh -c "
-        apk add --no-cache postgresql-client netcat-openbsd &&
-        echo 'Waiting for PostgreSQL to be ready...' &&
-        until nc -z db 5432; do
-          sleep 1
-        done &&
-        echo 'PostgreSQL is ready!' &&
-        npm ci --legacy-peer-deps &&
-        npx prisma generate &&
-        npx prisma migrate deploy &&
-        echo 'Migrations completed successfully!'
-      "
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - wms-network
-    restart: "no"
-
   # Next.js Application
   app:
     build:
@@ -71,10 +17,10 @@ services:
     #   - ./:/app
     #   - /app/node_modules
     #   - /app/.next
+    env_file:
+      - .env
     environment:
-      # DATABASE_URL: Use existing container's password if DB container exists, otherwise use env var
-      # This handles the case where an existing DB container has a different password
-      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-producebro9}@db:5432/${POSTGRES_DB:-wms}?schema=public
+      DATABASE_URL: ${DATABASE_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-$(openssl rand -base64 32)}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       AUTH_TRUST_HOST: "true"
@@ -87,9 +33,6 @@ services:
       QBO_ENVIRONMENT: ${QBO_ENVIRONMENT:-sandbox}
       NODE_ENV: production
     # Use production build (standalone mode) - server.js is in the built image
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
       - wms-network
     healthcheck:

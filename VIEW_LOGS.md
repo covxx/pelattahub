@@ -38,3 +38,5 @@ docker-compose logs app
 2. Click "Connect to QuickBooks" in the UI
 3. Watch the logs in real-time to see the OAuth flow
 
+
+

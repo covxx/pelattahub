@@ -40,3 +40,5 @@ END $$;
 -- Remove old expires_at column if token_expires_at exists (cleanup)
 -- Note: We keep expires_at for now to avoid breaking anything, but it's deprecated
 
+
+

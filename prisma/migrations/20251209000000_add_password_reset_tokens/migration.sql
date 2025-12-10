@@ -18,3 +18,5 @@ FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASC
 CREATE UNIQUE INDEX "password_reset_tokens_tokenHash_key" ON "password_reset_tokens"("tokenHash");
 CREATE INDEX "password_reset_tokens_userId_idx" ON "password_reset_tokens"("userId");
 CREATE INDEX "password_reset_tokens_expiresAt_idx" ON "password_reset_tokens"("expiresAt");
+
+
