@@ -10,6 +10,8 @@ export interface InventoryLot {
     name: string
     variety: string | null
     gtin: string | null
+    unit_type?: string
+    standard_case_weight?: number | null
   }
   quantity_received: number
   quantity_current: number

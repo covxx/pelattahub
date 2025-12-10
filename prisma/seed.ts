@@ -1,74 +1,75 @@
-import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
+import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Starting database seed...')
+  console.log("Seeding database...")
 
-  // Clear existing data (optional - comment out if you want to keep existing data)
-  console.log('🗑️  Cleaning up existing data...')
-  await prisma.inventoryLot.deleteMany()
-  await prisma.product.deleteMany()
-  await prisma.user.deleteMany()
+  // Create admin user
+  const email = "admin@example.com"
+  const password = "admin123"
+  const hashedPassword = await bcrypt.hash(password, 10)
 
-  // Create Admin User
-  console.log('👤 Creating admin user...')
-  const hashedPassword = await bcrypt.hash('admin123', 10)
+  // Delete existing admin user if exists
+  await prisma.user.deleteMany({
+    where: { email },
+  })
+
+  // Create admin user
   const adminUser = await prisma.user.create({
     data: {
-      name: 'Admin User',
-      email: 'admin@freshproduce.com',
+      email,
+      name: "Admin User",
       password: hashedPassword,
-      role: 'ADMIN',
+      role: "ADMIN",
     },
   })
-  console.log(`✅ Created admin user: ${adminUser.email}`)
 
-  // Create Sample Products
-  console.log('📦 Creating sample products...')
+  console.log("✅ Admin user created:")
+  console.log(`   Email: ${adminUser.email}`)
+  console.log(`   Password: admin123`)
+  console.log(`   Role: ${adminUser.role}`)
+
+  // Create vendors
+  console.log("\n🏢 Creating vendors...")
   
-  const product1 = await prisma.product.create({
-    data: {
-      sku: 'APP-GAL-40',
-      name: 'Gala Apples',
-      variety: 'Royal Gala',
-      description: 'Fresh Gala Apples - 40lb box',
-      gtin: '10012345678902', // 14-digit GTIN
-      target_temp_f: 32,
-      image_url: null,
+  const vendors = [
+    { name: "Sysco Corporation", code: "SYSCO" },
+    { name: "Local Farms Co-op", code: "LOCAL" },
+    { name: "Global Produce Inc", code: "GLOBAL" },
+  ]
+
+  for (const vendorData of vendors) {
+    const vendor = await prisma.vendor.upsert({
+      where: { code: vendorData.code },
+      update: {},
+      create: vendorData,
+    })
+    console.log(`   ✅ ${vendor.name} (${vendor.code})`)
+  }
+
+  // Initialize lot number sequence if it doesn't exist
+  console.log("\n🔢 Initializing lot number sequence...")
+  const lotSequenceSetting = await prisma.systemSetting.upsert({
+    where: { key: "next_lot_sequence" },
+    update: {}, // Don't update if it already exists
+    create: {
+      key: "next_lot_sequence",
+      value: "1",
+      description: "Next sequential number for lot number generation (8-digit format: 01 + 6 digits)",
     },
   })
-  console.log(`✅ Created product: ${product1.name} (GTIN: ${product1.gtin})`)
+  console.log(`   ✅ Lot number sequence initialized to: ${lotSequenceSetting.value}`)
 
-  const product2 = await prisma.product.create({
-    data: {
-      sku: 'BAN-CAV-40',
-      name: 'Cavendish Bananas',
-      variety: 'Cavendish',
-      description: 'Premium Cavendish Bananas - 40lb box',
-      gtin: '10012345678919', // 14-digit GTIN
-      target_temp_f: 56,
-      image_url: null,
-    },
-  })
-  console.log(`✅ Created product: ${product2.name} (GTIN: ${product2.gtin})`)
-
-  console.log('')
-  console.log('🎉 Seed completed successfully!')
-  console.log('')
-  console.log('📝 Login credentials:')
-  console.log('   Email: admin@freshproduce.com')
-  console.log('   Password: admin123')
-  console.log('')
+  console.log("\n✅ Database seeding completed!")
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error during seeding:', e)
+    console.error("Error seeding database:", e)
     process.exit(1)
   })
   .finally(async () => {
     await prisma.$disconnect()
   })
-

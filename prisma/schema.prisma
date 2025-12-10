@@ -15,6 +15,7 @@ enum Role {
   ADMIN
   RECEIVER
   PACKER
+  MANAGER
 }
 
 // Lot Status Enum
@@ -23,6 +24,30 @@ enum LotStatus {
   QC_PENDING
   AVAILABLE
   EXPIRED
+  DEPLETED
+}
+
+// Unit Type Enum
+enum UnitType {
+  CASE
+  LBS
+  EACH
+}
+
+// Receiving Status Enum
+enum ReceivingStatus {
+  OPEN
+  FINALIZED
+}
+
+// Order Status Enum
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  PICKING
+  PARTIAL_PICK
+  READY_TO_SHIP
+  SHIPPED
 }
 
 // User Model
@@ -38,8 +63,14 @@ model User {
   updatedAt     DateTime  @updatedAt
   
   // Relations
-  accounts      Account[]
-  sessions      Session[]
+  accounts         Account[]
+  sessions         Session[]
+  receivingEvents  ReceivingEvent[]
+  auditLogs        AuditLog[]
+  orders           Order[]
+  orderPicks       OrderPick[]
+  productionRuns   ProductionRun[]
+  passwordResetTokens PasswordResetToken[]
   
   @@map("users")
 }
@@ -86,47 +117,303 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// Product (SKU) Model
-model Product {
-  id            String    @id @default(cuid())
-  sku           String    @unique // e.g., "APP-GAL-40"
-  name          String    // e.g., "Gala Apples"
-  variety       String?   // e.g., "Royal Gala"
-  description   String?
-  gtin          String?   @unique // Global Trade Item Number (barcode/UPC) - must be unique
-  target_temp_f Int?      // Storage temp in Fahrenheit (useful for produce)
-  image_url     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+// Password reset tokens (hashed at rest)
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @db.Text
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+// Vendor Model
+model Vendor {
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String
+  code            String           @unique // e.g., "SYSCO", "LOCAL"
+  active          Boolean          @default(true)
+  qbo_id          String?          // QuickBooks Online Vendor ID
+  qbo_sync_token  String?          // QBO SyncToken for optimistic locking
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   
   // Relations
-  lots          InventoryLot[]
+  receivingEvents ReceivingEvent[]
   
+  @@index([qbo_id])
+  @@map("vendors")
+}
+
+// Customer Model
+model Customer {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  code           String   @unique // e.g., "CUST001"
+  address        String?
+  contact_email  String?
+  active         Boolean  @default(true)
+  qbo_id         String?  // QuickBooks Online Customer ID
+  qbo_sync_token String?  // QBO SyncToken for optimistic locking
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relations
+  orders         Order[]
+  
+  @@index([qbo_id])
+  @@map("customers")
+}
+
+// Audit Log Model
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  action      String   // e.g., "RECEIVE", "EDIT", "DELETE", "PRINT"
+  entity_type String   // e.g., "LOT", "RECEIVING_EVENT", "VENDOR", "PRODUCT"
+  entity_id   String   // The specific ID of the object modified
+  details     Json?    // Store { old_value: ..., new_value: ..., metadata: ... }
+  createdAt   DateTime @default(now())
+  
+  @@index([user_id])
+  @@index([action])
+  @@index([entity_type])
+  @@index([entity_id])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// System Setting Model
+model SystemSetting {
+  key         String   @id // e.g., "company_name", "company_address"
+  value       String   @db.Text // The actual setting value
+  description String?  // Optional description for admins
+  updatedAt   DateTime @updatedAt
+  
+  @@map("system_settings")
+}
+
+// Product (SKU) Model
+model Product {
+  id                     String         @id @default(cuid())
+  sku                    String         @unique // e.g., "APP-GAL-40"
+  name                   String         // e.g., "Gala Apples"
+  variety                String?        // e.g., "Royal Gala"
+  description            String?
+  gtin                   String         @unique // Global Trade Item Number (barcode/UPC) - required
+  default_origin_country String         // Default country for auto-fill
+  unit_type              UnitType       @default(CASE) // CASE, LBS, or EACH
+  standard_case_weight   Float?         // Weight in LBS of 1 case (e.g., 40.0 for apple case)
+  target_temp_f          Int?           // Storage temp in Fahrenheit (useful for produce)
+  image_url              String?
+  qbo_id                 String?        // QuickBooks Online Item ID
+  qbo_sync_token         String?        // QBO SyncToken for optimistic locking
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  
+  // Relations
+  lots                   InventoryLot[]
+  orderItems             OrderItem[]
+  
+  @@index([sku])
+  @@index([gtin])
+  @@index([qbo_id])
   @@map("products")
+}
+
+// Receiving Event Model - Batch Receiving Header
+model ReceivingEvent {
+  id              String           @id @default(uuid()) @db.Uuid
+  receipt_number  Int              @unique
+  vendor_id       String           @db.Uuid
+  vendor          Vendor           @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  received_date   DateTime
+  status          ReceivingStatus  @default(OPEN)
+  finalized_at    DateTime?
+  notes           String?
+  created_by      String
+  user            User             @relation(fields: [created_by], references: [id], onDelete: Restrict)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  // Relations
+  lots            InventoryLot[]
+  
+  @@index([vendor_id])
+  @@index([created_by])
+  @@index([received_date])
+  @@index([status])
+  @@index([receipt_number])
+  @@map("receiving_events")
 }
 
 // Inventory Lot Model - Core of the lot-based tracking system
 model InventoryLot {
-  id                String    @id @default(uuid()) @db.Uuid
-  lot_number        String    @unique
-  product_id        String
-  product           Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  id                  String          @id @default(uuid()) @db.Uuid
+  lot_number          String          @unique
+  product_id          String
+  product             Product         @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  receiving_event_id  String?         @db.Uuid
+  receivingEvent      ReceivingEvent? @relation(fields: [receiving_event_id], references: [id], onDelete: SetNull)
+  parent_lot_id       String?         @db.Uuid
+  parentLot           InventoryLot?   @relation("LotParent", fields: [parent_lot_id], references: [id], onDelete: SetNull)
   
-  quantity_received Int
-  quantity_current  Int
-  received_date     DateTime  @default(now())
-  expiry_date       DateTime
+  original_quantity   Int             // Initial quantity received
+  quantity_received   Int             // Same as original for backwards compatibility
+  quantity_current    Int             // Current quantity (after adjustments)
+  received_date       DateTime        @default(now())
+  expiry_date         DateTime
   
-  origin_country    String    // Crucial for produce
-  grower_id         String?   // Optional
-  status            LotStatus @default(RECEIVED)
+  origin_country      String          // Crucial for produce
+  grower_id           String?         // Optional
+  status              LotStatus       @default(RECEIVED)
   
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  
+  // Relations
+  allocations         OrderAllocation[]
+  picks               OrderPick[]
+  childLots           InventoryLot[]  @relation("LotParent")
+  sourceProductionRuns ProductionRun[] @relation("SourceLot")
+  destinationProductionRuns ProductionRun[] @relation("DestinationLot")
   
   @@index([product_id])
+  @@index([lot_number])
+  @@index([status])
+  @@index([receiving_event_id])
   @@index([received_date])
   @@index([expiry_date])
-  @@index([status])
+  @@index([parent_lot_id])
   @@map("inventory_lots")
+}
+
+// Order Model - Outbound Sales Orders
+model Order {
+  id            String       @id @default(uuid()) @db.Uuid
+  order_number  String?      @unique // Optional sequential order number (temporarily disabled)
+  customer_id   String       @db.Uuid
+  customer      Customer     @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  po_number     String?      // Purchase Order Number from customer
+  delivery_date DateTime
+  status        OrderStatus  @default(DRAFT)
+  created_by    String
+  user          User         @relation(fields: [created_by], references: [id], onDelete: Restrict)
+  qbo_id        String?      // QuickBooks Online Invoice ID
+  qbo_sync_token String?     // QBO SyncToken for optimistic locking
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  items         OrderItem[]
+  
+  @@index([customer_id])
+  @@index([status])
+  @@index([delivery_date])
+  @@index([created_by])
+  @@index([order_number])
+  @@index([qbo_id])
+  @@map("orders")
+}
+
+// Order Item Model - Products ordered in an order
+model OrderItem {
+  id              String           @id @default(uuid()) @db.Uuid
+  order_id        String           @db.Uuid
+  order           Order            @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product_id      String
+  product         Product          @relation(fields: [product_id], references: [id], onDelete: Restrict)
+  quantity_ordered Int
+  unit_price      Float?           // Unit price from QBO invoice
+  
+  // Relations
+  allocations     OrderAllocation[]
+  picks           OrderPick[]
+  
+  @@index([order_id])
+  @@index([product_id])
+  @@map("order_items")
+}
+
+// Order Allocation Model - Links Order Items to specific Inventory Lots (FIFO allocation)
+model OrderAllocation {
+  id                String        @id @default(uuid()) @db.Uuid
+  order_item_id     String        @db.Uuid
+  order_item        OrderItem     @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
+  inventory_lot_id  String        @db.Uuid
+  inventory_lot     InventoryLot  @relation(fields: [inventory_lot_id], references: [id], onDelete: Restrict)
+  quantity_allocated Int
+  
+  createdAt         DateTime      @default(now())
+  
+  @@unique([order_item_id, inventory_lot_id])
+  @@index([order_item_id])
+  @@index([inventory_lot_id])
+  @@map("order_allocations")
+}
+
+// Order Pick Model - Tracks physical picking of inventory for orders
+model OrderPick {
+  id                String        @id @default(uuid()) @db.Uuid
+  order_item_id     String        @db.Uuid
+  order_item        OrderItem     @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
+  inventory_lot_id  String        @db.Uuid
+  inventory_lot     InventoryLot  @relation(fields: [inventory_lot_id], references: [id], onDelete: Restrict)
+  quantity_picked   Float         // Can be Int or Float depending on unit type (CASE, LBS, EACH)
+  picked_at         DateTime      @default(now())
+  picked_by_user_id String
+  picked_by_user    User          @relation(fields: [picked_by_user_id], references: [id], onDelete: Restrict)
+  
+  createdAt         DateTime      @default(now())
+  
+  @@index([order_item_id])
+  @@index([inventory_lot_id])
+  @@index([picked_by_user_id])
+  @@index([picked_at])
+  @@map("order_picks")
+}
+
+// Integration Settings Model - Stores OAuth tokens and integration config
+model IntegrationSettings {
+  id                        String   @id @default(uuid()) @db.Uuid
+  provider                  String   @unique // e.g., "qbo" (singleton for QBO)
+  access_token              String   @db.Text // Access token
+  refresh_token             String?  @db.Text // Refresh token (CRITICAL for offline access)
+  token_expires_at          DateTime? // Access token expiration timestamp
+  refresh_token_expires_at  DateTime? // Refresh token expiration timestamp
+  realm_id                  String?  // QBO Company ID (realm)
+  is_connected              Boolean  @default(false) // Connection status
+  metadata                  Json?    // Additional provider-specific data (e.g., company name)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  
+  @@map("integration_settings")
+}
+
+// Production Run Model - Tracks inventory conversion/repacking operations
+model ProductionRun {
+  id                String        @id @default(uuid()) @db.Uuid
+  created_at        DateTime      @default(now())
+  user_id           String
+  user              User          @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  source_lot_id     String        @db.Uuid
+  sourceLot         InventoryLot  @relation("SourceLot", fields: [source_lot_id], references: [id], onDelete: Restrict)
+  destination_lot_id String       @db.Uuid
+  destinationLot    InventoryLot  @relation("DestinationLot", fields: [destination_lot_id], references: [id], onDelete: Restrict)
+  quantity_consumed  Float
+  quantity_produced  Float
+  notes             String?
+  
+  @@index([user_id])
+  @@index([source_lot_id])
+  @@index([destination_lot_id])
+  @@index([created_at])
+  @@map("production_runs")
 }

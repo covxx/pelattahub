@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
@@ -18,7 +18,7 @@ COPY . .
 # Generate Prisma Client
 # Provide a dummy DATABASE_URL for build time (prisma generate doesn't actually connect)
 ENV DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy?schema=public"
-RUN npx prisma generate
+RUN npx prisma@6.19.0 generate
 
 # Build Next.js application
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -31,8 +31,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install wget for healthcheck
-RUN apk add --no-cache wget
+# Install curl for healthcheck
+RUN apk add --no-cache curl
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
@@ -46,6 +46,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
+# Create logs directory (fallback for any libraries that might need it)
+# Must be done before switching to nextjs user
+RUN mkdir -p /app/logs && chown -R nextjs:nodejs /app/logs && chmod 755 /app/logs
+
 USER nextjs
 
 EXPOSE 3000
@@ -54,4 +58,3 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
-

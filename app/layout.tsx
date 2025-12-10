@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ZebraPrinterProvider } from "@/contexts/ZebraPrinterContext";
@@ -25,11 +26,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ZebraPrinterProvider>
-          {children}
+          <div className="min-h-screen flex flex-col">
+            <main className="flex-1">{children}</main>
+            <footer className="border-t bg-muted/30">
+              <div className="container mx-auto flex flex-col gap-2 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <div className="font-medium text-foreground">
+                  © {new Date().getFullYear()} SRJLabs. All rights reserved.
+                </div>
+                <div className="flex items-center gap-4">
+                  <Link href="/privacy" className="hover:text-foreground">
+                    Privacy Policy
+                  </Link>
+                  <Link href="/terms" className="hover:text-foreground">
+                    Terms &amp; Conditions
+                  </Link>
+                </div>
+              </div>
+            </footer>
+          </div>
         </ZebraPrinterProvider>
       </body>
     </html>

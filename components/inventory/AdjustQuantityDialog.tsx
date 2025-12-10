@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { adjustLotQuantity } from "@/app/actions/inventory"
+import { adjustLotQuantity } from "@/app/actions/inventory-adjust"
 import type { InventoryLot } from "@/types/inventory"
 
 const adjustSchema = z.object({
@@ -58,11 +58,11 @@ export function AdjustQuantityDialog({
     setError(null)
     startTransition(async () => {
       try {
-        const result = await adjustLotQuantity(
-          lot.id,
-          data.quantity,
-          data.reason
-        )
+        const result = await adjustLotQuantity({
+          lotId: lot.id,
+          newQuantity: data.quantity,
+          reason: data.reason || "",
+        })
         if (result.success) {
           onOpenChange(false)
           // Refresh the page to show updated data

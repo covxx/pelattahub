@@ -3,187 +3,212 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { unstable_noStore as noStore } from "next/cache"
+
+interface InventoryCatalogFilters {
+  activeOnly?: boolean
+  search?: string
+}
 
 /**
- * Get all inventory lots grouped by product
+ * Get inventory catalog with aggregated lot data
+ * 
+ * Note: Uses noStore() to prevent caching - WMS data is highly dynamic
+ * and must always reflect real-time inventory levels.
  */
-export async function getInventoryLots() {
-  const lots = await prisma.inventoryLot.findMany({
-    where: {
-      status: {
-        in: ["RECEIVED", "QC_PENDING", "AVAILABLE"],
-      },
-    },
+export async function getInventoryCatalog(filters: InventoryCatalogFilters = {}) {
+  // Prevent Next.js from caching this data - warehouse inventory is highly dynamic
+  noStore()
+  
+  const { activeOnly = true, search = "" } = filters
+
+  const where: any = {}
+
+  // Filter by search term (product name, SKU, or GTIN)
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { sku: { contains: search, mode: "insensitive" } },
+      { gtin: { contains: search, mode: "insensitive" } },
+    ]
+  }
+
+  // Get products with their lots
+  const products = await prisma.product.findMany({
+    where,
     include: {
-      product: {
+      lots: {
+        where: activeOnly
+          ? {
+              status: {
+                in: ["RECEIVED", "QC_PENDING", "AVAILABLE"],
+              },
+            }
+          : {},
         select: {
           id: true,
-          sku: true,
-          name: true,
-          variety: true,
-          gtin: true,
+          lot_number: true,
+          quantity_received: true,
+          quantity_current: true,
+          received_date: true,
+          expiry_date: true,
+          origin_country: true,
+          status: true,
+        },
+        orderBy: {
+          received_date: "desc",
         },
       },
     },
-    orderBy: [
-      { product: { name: "asc" } },
-      { expiry_date: "asc" }, // FIFO: oldest first
-    ],
-  })
-
-  return lots
-}
-
-/**
- * Adjust quantity for a lot
- */
-export async function adjustLotQuantity(
-  lotId: string,
-  newQuantity: number,
-  reason?: string
-) {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-
-  if (newQuantity < 0) {
-    throw new Error("Quantity cannot be negative")
-  }
-
-  const lot = await prisma.inventoryLot.update({
-    where: { id: lotId },
-    data: {
-      quantity_current: newQuantity,
-      status: newQuantity === 0 ? "EXPIRED" : undefined,
+    orderBy: {
+      name: "asc",
     },
   })
 
-  // TODO: Create audit log entry
-  // await createAuditLog({
-  //   lotId,
-  //   userId: session.user.id,
-  //   action: "ADJUST_QUANTITY",
-  //   oldValue: lot.quantity_current,
-  //   newValue: newQuantity,
-  //   reason,
-  // })
+  // Aggregate lot data for each product
+  return products.map((product) => {
+    const activeLots = product.lots.filter(
+      (lot) =>
+        lot.status === "RECEIVED" ||
+        lot.status === "QC_PENDING" ||
+        lot.status === "AVAILABLE"
+    )
 
-  revalidatePath("/dashboard/inventory")
-  return { success: true, lot }
+    const totalOnHand = activeLots.reduce(
+      (sum, lot) => sum + lot.quantity_current,
+      0
+    )
+
+    return {
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      variety: product.variety,
+      gtin: product.gtin,
+      unit_type: product.unit_type,
+      standard_case_weight: product.standard_case_weight,
+      total_on_hand: totalOnHand,
+      active_lot_count: activeLots.length,
+      lots: activeLots,
+    }
+  })
 }
 
 /**
- * Get lot history/audit log (placeholder for future implementation)
+ * Get a single product with all its lots
  */
-export async function getLotHistory(lotId: string) {
-  // TODO: Implement audit log system
-  return []
-}
-
-/**
- * Create a new inventory lot
- */
-export async function createLot(data: {
-  productId: string
-  quantityReceived: number
-  receivedDate: Date
-  originCountry: string
-  growerId?: string
-}) {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-
-  // Check if user has RECEIVER or ADMIN role
-  if (session.user.role !== "RECEIVER" && session.user.role !== "ADMIN") {
-    throw new Error("Unauthorized: Only RECEIVER or ADMIN can create lots")
-  }
-
-  // Get product to verify it exists and has GTIN
+export async function getProductWithLots(productId: string) {
   const product = await prisma.product.findUnique({
-    where: { id: data.productId },
-    select: {
-      id: true,
-      sku: true,
-      name: true,
-      variety: true,
-      gtin: true,
+    where: { id: productId },
+    include: {
+      lots: {
+        where: {
+          status: {
+            in: ["RECEIVED", "QC_PENDING", "AVAILABLE"],
+          },
+        },
+        select: {
+          id: true,
+          lot_number: true,
+          quantity_received: true,
+          quantity_current: true,
+          received_date: true,
+          expiry_date: true,
+          origin_country: true,
+          status: true,
+        },
+        orderBy: {
+          received_date: "desc",
+        },
+      },
     },
   })
 
   if (!product) {
-    throw new Error("Product not found")
+    return null
   }
 
-  if (!product.gtin) {
-    throw new Error("Cannot receive this product: Missing GTIN in Master Data")
+  const activeLots = product.lots.filter(
+    (lot) =>
+      lot.status === "RECEIVED" ||
+      lot.status === "QC_PENDING" ||
+      lot.status === "AVAILABLE"
+  )
+
+  const totalOnHand = activeLots.reduce(
+    (sum, lot) => sum + lot.quantity_current,
+    0
+  )
+
+  return {
+    id: product.id,
+    sku: product.sku,
+    name: product.name,
+    variety: product.variety,
+    gtin: product.gtin,
+    unit_type: product.unit_type,
+    standard_case_weight: product.standard_case_weight,
+    total_on_hand: totalOnHand,
+    active_lot_count: activeLots.length,
+    lots: activeLots,
   }
-
-  // Generate lot number: SKU-YYYYMMDD-HHMMSS
-  const now = new Date()
-  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "")
-  const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "")
-  const lotNumber = `${product.sku}-${dateStr}-${timeStr}`
-    .replace(/[^A-Za-z0-9-]/g, "") // Remove special characters that break ZPL
-    .toUpperCase()
-
-  // Calculate expiry date (10 days from received date)
-  const expiryDate = new Date(data.receivedDate)
-  expiryDate.setDate(expiryDate.getDate() + 10)
-
-  // Create the lot
-  const lot = await prisma.inventoryLot.create({
-    data: {
-      lot_number: lotNumber,
-      product_id: data.productId,
-      quantity_received: data.quantityReceived,
-      quantity_current: data.quantityReceived,
-      received_date: data.receivedDate,
-      expiry_date: expiryDate,
-      origin_country: data.originCountry,
-      grower_id: data.growerId,
-      status: "RECEIVED",
-    },
-    include: {
-      product: {
-        select: {
-          id: true,
-          sku: true,
-          name: true,
-          variety: true,
-          gtin: true,
-        },
-      },
-    },
-  })
-
-  revalidatePath("/dashboard/inventory")
-  revalidatePath("/dashboard/receiving")
-
-  return { success: true, lot }
 }
 
 /**
- * Get a single lot by ID with product details
+ * Get lot lifecycle data (non-admin version for inventory users)
  */
-export async function getLotById(lotId: string) {
+export async function getLotLifecycleForUser(lotId: string) {
+  const session = await auth()
+
+  if (!session?.user) {
+    throw new Error("Unauthorized")
+  }
+
+  // Get the lot with all related data
   const lot = await prisma.inventoryLot.findUnique({
     where: { id: lotId },
     include: {
-      product: {
-        select: {
-          id: true,
-          sku: true,
-          name: true,
-          variety: true,
-          gtin: true,
+      product: true,
+      receivingEvent: {
+        include: {
+          vendor: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
         },
       },
     },
   })
 
-  return lot
-}
+  if (!lot) {
+    return null
+  }
 
+  // Get all audit logs for this lot
+  const auditTrail = await prisma.auditLog.findMany({
+    where: {
+      entity_type: "LOT",
+      entity_id: lotId,
+    },
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  })
+
+  return {
+    lot,
+    auditTrail,
+  }
+}

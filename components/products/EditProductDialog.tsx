@@ -22,35 +22,39 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { updateProduct } from "@/app/actions/products"
 import type { Product } from "@/types/product"
 
 const productSchema = z.object({
   sku: z.string().min(1, "SKU is required"),
   name: z.string().min(1, "Name is required"),
-  variety: z.string().optional().nullable(),
-  description: z.string().optional().nullable(),
   gtin: z
     .string()
-    .optional()
-    .nullable()
+    .min(1, "GTIN is required")
     .transform((val) => {
-      if (!val || val.trim() === "") return null
       // Remove any non-digit characters
       const digits = val.replace(/\D/g, "")
-      if (digits.length === 0) return null
       // Pad to 14 digits if less than 14
       return digits.padStart(14, "0")
     })
     .refine(
-      (val) => {
-        if (val === null) return true
-        return val.length === 14 && /^\d{14}$/.test(val)
-      },
+      (val) => val.length === 14 && /^\d{14}$/.test(val),
       { message: "GTIN must be exactly 14 digits" }
     ),
-  target_temp_f: z.number().int().optional().nullable(),
-  image_url: z.string().url().optional().nullable().or(z.literal("")),
+  default_origin_country: z.string().min(1, "Origin country is required"),
+  unit_type: z.enum(["CASE", "LBS", "EACH"]),
+  standard_case_weight: z.number().positive().nullable().optional(),
+  variety: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  target_temp_f: z.number().int().nullable().optional(),
+  image_url: z.string().url().nullable().optional().or(z.literal("")),
 })
 
 type ProductFormValues = z.infer<typeof productSchema>
@@ -76,9 +80,12 @@ export function EditProductDialog({
     defaultValues: {
       sku: product.sku,
       name: product.name,
+      gtin: product.gtin,
+      default_origin_country: product.default_origin_country,
+      unit_type: product.unit_type,
+      standard_case_weight: product.standard_case_weight,
       variety: product.variety,
       description: product.description,
-      gtin: product.gtin,
       target_temp_f: product.target_temp_f,
       image_url: product.image_url,
     },
@@ -91,9 +98,12 @@ export function EditProductDialog({
         const result = await updateProduct(product.id, {
           sku: data.sku,
           name: data.name,
+          gtin: data.gtin,
+          default_origin_country: data.default_origin_country,
+          unit_type: data.unit_type,
+          standard_case_weight: data.standard_case_weight || null,
           variety: data.variety || null,
           description: data.description || null,
-          gtin: data.gtin || null,
           target_temp_f: data.target_temp_f || null,
           image_url: data.image_url || null,
         })
@@ -187,12 +197,78 @@ export function EditProductDialog({
                     <Input
                       placeholder="10012345678902"
                       {...field}
-                      value={field.value || ""}
                       maxLength={14}
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground mt-1">
                     14-digit GTIN required for GS1-128 barcodes. Will auto-pad if you enter 12 digits.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="default_origin_country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Origin Country *</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="unit_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit Type *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="CASE">Case</SelectItem>
+                        <SelectItem value="LBS">Pounds (LBS)</SelectItem>
+                        <SelectItem value="EACH">Each</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="standard_case_weight"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Standard Case Weight (lbs)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="40.00"
+                      {...field}
+                      value={field.value || ""}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value ? parseFloat(e.target.value) : null
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    The weight in pounds of 1 case (e.g., 40 for a case of apples). Used for weight estimation.
                   </p>
                   <FormMessage />
                 </FormItem>

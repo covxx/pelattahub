@@ -53,3 +53,11 @@ docker-compose.yml
 # Prisma (will be generated in container)
 app/generated/prisma
 
+# PostgreSQL data
+pgdata
+
+# Temp files
+test-password.js
+scripts/create-admin.ts
+scripts/hash-password.js
+

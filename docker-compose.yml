@@ -1,58 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  db:
-    image: postgres:15-alpine
-    container_name: wms-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-wms}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wms_password}
-      POSTGRES_DB: ${POSTGRES_DB:-wms}
-    volumes:
-      # IMPORTANT: Local directory mapping for data persistence
-      - ./pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wms}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - wms-network
-
-  # Prisma Migration Init Container
-  prisma-migrate:
-    image: node:20-alpine
-    container_name: wms-prisma-migrate
-    working_dir: /app
-    volumes:
-      - .:/app
-      - /app/node_modules
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-wms_password}@db:5432/${POSTGRES_DB:-wms}?schema=public
-    command: >
-      sh -c "
-        apk add --no-cache postgresql-client netcat-openbsd &&
-        echo 'Waiting for PostgreSQL to be ready...' &&
-        until nc -z db 5432; do
-          sleep 1
-        done &&
-        echo 'PostgreSQL is ready!' &&
-        npm install &&
-        npx prisma generate &&
-        npx prisma migrate deploy &&
-        echo 'Migrations completed successfully!'
-      "
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - wms-network
-    restart: "no"
-
   # Next.js Application
   app:
     build:
@@ -62,24 +10,36 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # PRODUCTION MODE: No volume mounts - uses built standalone image from Dockerfile
+    # Volume mounts would overwrite the built files and cause "next: not found" errors
+    # For development with hot-reload, uncomment volumes below and change command to "npm run dev"
+    # volumes:
+    #   - ./:/app
+    #   - /app/node_modules
+    #   - /app/.next
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-wms}:${POSTGRES_PASSWORD:-wms_password}@db:5432/${POSTGRES_DB:-wms}?schema=public
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-$(openssl rand -base64 32)}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: "true"
       NEXT_PUBLIC_COMPANY_NAME: ${NEXT_PUBLIC_COMPANY_NAME:-Fresh Farm Logic LLC}
       NEXT_PUBLIC_COMPANY_ADDRESS: ${NEXT_PUBLIC_COMPANY_ADDRESS:-1234 Produce Lane, Salinas, CA}
+      # QuickBooks Online Integration
+      QBO_CLIENT_ID: ${QBO_CLIENT_ID}
+      QBO_CLIENT_SECRET: ${QBO_CLIENT_SECRET}
+      QBO_REDIRECT_URI: ${QBO_REDIRECT_URI:-http://localhost:3000/api/auth/qbo/callback}
+      QBO_ENVIRONMENT: ${QBO_ENVIRONMENT:-sandbox}
       NODE_ENV: production
-    depends_on:
-      prisma-migrate:
-        condition: service_completed_successfully
+    # Use production build (standalone mode) - server.js is in the built image
     networks:
       - wms-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
 
 networks:
   wms-network:

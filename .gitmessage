@@ -1,0 +1,28 @@
+# <type>(<scope>): <subject>
+# 
+# <body>
+# 
+# <footer>
+#
+# Types:
+#   feat     - New feature
+#   fix      - Bug fix
+#   docs     - Documentation changes
+#   style    - Code style changes (formatting, no logic change)
+#   refactor - Code refactoring
+#   perf     - Performance improvements
+#   test     - Adding or updating tests
+#   chore    - Maintenance tasks (deps, config, etc.)
+#
+# Scope (optional): inventory, receiving, admin, auth, receiving, etc.
+#
+# Examples:
+#   feat(inventory): Add lot lifecycle sheet component
+#   fix(auth): Resolve password reset issue
+#   refactor(actions): Consolidate inventory actions
+#   chore(deps): Update Prisma to 6.19.0
+#
+# Body should explain WHAT and WHY, not HOW
+# Footer can reference issues: Fixes #123, Closes #456
+
+
