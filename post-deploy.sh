@@ -132,7 +132,9 @@ echo ""
 # 6. Run Database Migrations
 # =============================================================================
 echo -e "${YELLOW}🗄️  Running database migrations...${NC}"
-if docker compose exec -T app npx prisma migrate deploy; then
+# Use the Prisma version from package.json (6.19.0)
+# The --yes flag prevents npx from prompting, and @6.19.0 ensures we use the correct version
+if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
   echo -e "${GREEN}✅ Migrations completed${NC}"
 else
   echo -e "${RED}❌ Migration failed! Check logs:${NC}"
