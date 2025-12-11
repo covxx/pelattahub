@@ -14,7 +14,7 @@ SERVER_IP="YOUR_HETZNER_IP_HERE"
 SSH_USER="root"
 
 # Set the remote project directory
-REMOTE_DIR="/root/wms"
+REMOTE_DIR="~/opt/pelattahub"
 
 # =============================================================================
 # VALIDATION

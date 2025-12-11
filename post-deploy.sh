@@ -14,13 +14,16 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_DIR="${PROJECT_DIR:-/root/wms}"
+PROJECT_DIR="${PROJECT_DIR:-$HOME/opt/pelattahub}"
 HEALTH_URL="${HEALTH_URL:-http://localhost:3000/api/health}"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Post-Deployment Verification${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
+
+# Expand tilde if present in PROJECT_DIR
+PROJECT_DIR="${PROJECT_DIR/#\~/$HOME}"
 
 # Change to project directory
 cd "$PROJECT_DIR" || {
