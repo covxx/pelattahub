@@ -109,8 +109,6 @@ export function generateProduceLabel(lotData: LotData): string {
 
   // ZPL Commands
   // ^XA = Start of label
-  // ^PW = Print Width (812 dots for 4 inches at 203 DPI)
-  // ^LL = Label Length (406 dots for 2 inches at 203 DPI)
   // ^FO = Field Origin (x,y coordinates in dots)
   // ^A0N = Font (0 = default, N = normal orientation)
   // ^BCN = Code 128 barcode (N = normal orientation)
@@ -119,31 +117,6 @@ export function generateProduceLabel(lotData: LotData): string {
   // ^XZ = End of label
 
   const zpl = `^XA
-^PW812
-^LL406
-
-~TA000
-~JSN
-^LT0
-^MNW
-^MTT
-^PON
-^PMN
-^LH0,0
-^JMA
-^PR4,4
-~SD15
-^JUS
-^LRN
-^CI0
-^XZ
-
-^XA
-^MMT
-^PW812
-^LL406
-^LS0
-
 ^FO10,10^A0N,30,30^FD${safeCompanyName}^FS
 ^FO10,45^A0N,20,20^FD${safeCompanyAddress}^FS
 
@@ -228,31 +201,6 @@ export function generateCaseLabel(
 
   // ZPL Commands for PTI-Compliant 4x2 Label
   const zpl = `^XA
-^PW812
-^LL406
-
-~TA000
-~JSN
-^LT0
-^MNW
-^MTT
-^PON
-^PMN
-^LH0,0
-^JMA
-^PR4,4
-~SD15
-^JUS
-^LRN
-^CI0
-^XZ
-
-^XA
-^MMT
-^PW812
-^LL406
-^LS0
-
 ^CF0,25
 ^FO0,5^FB812,1,0,C,0^FD${safeCompanyName}\\&^FS
 
@@ -346,31 +294,6 @@ export function generateMasterLabel(
 
   // ZPL Commands for 4x6 label (Master Pallet Label)
   const zpl = `^XA
-^PW812
-^LL1218
-
-~TA000
-~JSN
-^LT0
-^MNW
-^MTT
-^PON
-^PMN
-^LH0,0
-^JMA
-^PR4,4
-~SD15
-^JUS
-^LRN
-^CI0
-^XZ
-
-^XA
-^MMT
-^PW812
-^LL1218
-^LS0
-
 ^FO0,30^GB812,100,100^FS
 ^FO30,60^A0N,60,60^FR^FDPALLET LABEL^FS
 
@@ -486,31 +409,6 @@ export function generatePTILabel(
 
   // ZPL Commands for PTI-Compliant 4x2 Label
   const zpl = `^XA
-^PW812
-^LL406
-
-~TA000
-~JSN
-^LT0
-^MNW
-^MTT
-^PON
-^PMN
-^LH0,0
-^JMA
-^PR4,4
-~SD15
-^JUS
-^LRN
-^CI0
-^XZ
-
-^XA
-^MMT
-^PW812
-^LL406
-^LS0
-
 ^BY2,3,70^FO50,30^BCN,100,N,N^FD${barcodeData}^FS
 ^CF0,14
 ^FO0,140^FB812,1,0,C,0^FD${barcodeHRI}^FS
