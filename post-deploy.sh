@@ -102,7 +102,21 @@ sleep 3
 echo -e "${YELLOW}📊 Checking service status...${NC}"
 docker compose ps
 
+# Check if services are running - use multiple methods for reliability
 SERVICES_UP=$(docker compose ps --format json 2>/dev/null | jq -r 'select(.State == "running") | .Name' 2>/dev/null | wc -l || echo "0")
+
+# Alternative check: count containers with "Up" status
+if [ "$SERVICES_UP" -eq 0 ]; then
+  SERVICES_UP=$(docker compose ps 2>/dev/null | grep -c "Up" || echo "0")
+fi
+
+# Final check: verify container exists and is running
+if [ "$SERVICES_UP" -eq 0 ]; then
+  # Check if wms-app container exists and is running
+  if docker ps --filter "name=wms-app" --format "{{.Status}}" | grep -q "Up"; then
+    SERVICES_UP=1
+  fi
+fi
 
 if [ "$SERVICES_UP" -eq 0 ]; then
   echo -e "${RED}❌ No services are running!${NC}"
@@ -174,12 +188,21 @@ echo ""
 # 10. Verify Image Version
 # =============================================================================
 echo -e "${YELLOW}🔍 Verifying running container uses latest image...${NC}"
+
+# Get the image ID from the running container
 RUNNING_IMAGE_ID=$(docker inspect wms-app --format='{{.Image}}' 2>/dev/null | cut -d: -f2 | cut -c1-12)
+
+# Get the latest wms-app image ID
 LATEST_IMAGE_ID=$(docker images wms-app --format "{{.ID}}" | head -1 | cut -c1-12)
 
-if [ "$RUNNING_IMAGE_ID" = "$LATEST_IMAGE_ID" ]; then
+if [ -z "$RUNNING_IMAGE_ID" ]; then
+  echo -e "${YELLOW}⚠️  Could not get running container image ID${NC}"
+elif [ -z "$LATEST_IMAGE_ID" ]; then
+  echo -e "${YELLOW}⚠️  Could not get latest image ID${NC}"
+elif [ "$RUNNING_IMAGE_ID" = "$LATEST_IMAGE_ID" ]; then
   echo -e "${GREEN}✅ Container is using the latest image${NC}"
   echo "   Running Image ID: $RUNNING_IMAGE_ID"
+  echo "   Latest Image ID:  $LATEST_IMAGE_ID"
 else
   echo -e "${YELLOW}⚠️  Container image ID doesn't match latest${NC}"
   echo "   Running: $RUNNING_IMAGE_ID"
