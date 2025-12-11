@@ -155,8 +155,49 @@ export async function getProductWithLots(productId: string) {
 }
 
 /**
- * Get lot lifecycle data (non-admin version for inventory users)
+ * Get a single lot with receiving event information (for pallet label printing)
  */
+export async function getLotWithReceivingEvent(lotId: string) {
+  noStore()
+  
+  const lot = await prisma.inventoryLot.findUnique({
+    where: { id: lotId },
+    select: {
+      id: true,
+      lot_number: true,
+      received_date: true,
+      quantity_received: true,
+      quantity_current: true,
+      original_quantity: true,
+      product: {
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+          gtin: true,
+          variety: true,
+          unit_type: true,
+          standard_case_weight: true,
+        },
+      },
+      receivingEvent: {
+        select: {
+          id: true,
+          vendor: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  return lot
+}
+
 export async function getLotLifecycleForUser(lotId: string) {
   const session = await auth()
 

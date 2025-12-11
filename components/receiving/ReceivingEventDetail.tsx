@@ -6,7 +6,7 @@ import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Printer, FileText, ArrowLeft, Edit2, Check, X } from "lucide-react"
+import { Printer, FileText, ArrowLeft, Edit2, Check, X, Package } from "lucide-react"
 import { finalizeReceivingEvent, updateLotQuantity } from "@/app/actions/receiving"
 import { getCompanySettings } from "@/app/actions/settings"
 import { generateMasterLabel, generatePTILabel } from "@/lib/zpl-generator"
@@ -53,6 +53,32 @@ export function ReceivingEventDetail({
       return
     }
     setShowPDFModal(true)
+  }
+
+  const handlePrintPalletLabel = (lot: any) => {
+    try {
+      // Use master pallet label (4x6)
+      const lotWithVendor = {
+        ...lot,
+        receivingEvent: event ? {
+          vendor: event.vendor
+        } : undefined
+      }
+      const zpl = generateMasterLabel(lotWithVendor, lot.product)
+      
+      printZplViaBrowser(zpl, {
+        windowTitle: `Pallet Label - ${lot.lot_number}`,
+      })
+
+      toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
+    } catch (err) {
+      toast(
+        err instanceof Error
+          ? err.message
+          : "Failed to open print window. Please allow popups.",
+        "error"
+      )
+    }
   }
 
   const handlePrintAllLabels = () => {
@@ -286,7 +312,8 @@ export function ReceivingEventDetail({
                 <th className="text-right py-2">Quantity</th>
                 <th className="text-left py-2">Unit</th>
                 <th className="text-right py-2">Current</th>
-                {canEdit && isEditMode && <th className="text-center py-2">Actions</th>}
+                <th className="text-center py-2">Actions</th>
+                {canEdit && isEditMode && <th className="text-center py-2">Edit</th>}
               </tr>
             </thead>
             <tbody>
@@ -313,6 +340,17 @@ export function ReceivingEventDetail({
                   </td>
                   <td className="py-3">{lot.product.unit_type}</td>
                   <td className="text-right py-3">{lot.quantity_current}</td>
+                  <td className="text-center py-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePrintPalletLabel(lot)}
+                      title="Reprint Pallet Label"
+                    >
+                      <Package className="h-4 w-4 mr-1" />
+                      Pallet
+                    </Button>
+                  </td>
                   {canEdit && isEditMode && (
                     <td className="text-center py-3">
                       {editingLotId === lot.id ? (
@@ -354,6 +392,7 @@ export function ReceivingEventDetail({
                 <td colSpan={3} className="py-3">Total Items:</td>
                 <td className="text-right py-3">{event.lots.length}</td>
                 <td colSpan={canEdit && isEditMode ? 3 : 2}></td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
