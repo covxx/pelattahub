@@ -67,11 +67,23 @@ echo -e "${YELLOW}⚙️  Preparing to use latest image...${NC}"
 # Check if docker-compose.yml uses 'image:' directive
 if grep -q "^[[:space:]]*image:[[:space:]]*wms-app" docker-compose.yml 2>/dev/null; then
   echo -e "${GREEN}✅ docker-compose.yml configured to use image: wms-app${NC}"
+  USE_OVERRIDE=false
 elif grep -q "^[[:space:]]*build:" docker-compose.yml 2>/dev/null; then
   echo -e "${YELLOW}ℹ️  docker-compose.yml has 'build:' section${NC}"
-  echo -e "${GREEN}   Using --no-build flag to ensure loaded image is used${NC}"
+  echo -e "${YELLOW}   Creating override file to use loaded image...${NC}"
+  
+  # Create a temporary override file to specify the image
+  cat > docker-compose.override.tmp.yml << 'EOF'
+services:
+  app:
+    image: wms-app
+EOF
+  
+  USE_OVERRIDE=true
+  echo -e "${GREEN}✅ Created docker-compose.override.tmp.yml to use image: wms-app${NC}"
 else
   echo -e "${GREEN}✅ docker-compose.yml configuration looks good${NC}"
+  USE_OVERRIDE=false
 fi
 echo ""
 
@@ -82,7 +94,12 @@ echo -e "${YELLOW}🚀 Starting services with latest image...${NC}"
 
 # Use --no-build to ensure we use the loaded image, not build a new one
 # Use --force-recreate to ensure containers are recreated with the new image
-docker compose up -d --force-recreate --no-build
+# Include override file if created
+if [ "$USE_OVERRIDE" = true ]; then
+  docker compose -f docker-compose.yml -f docker-compose.override.tmp.yml up -d --force-recreate --no-build
+else
+  docker compose up -d --force-recreate --no-build
+fi
 
 if [ $? -ne 0 ]; then
   echo -e "${RED}❌ Failed to start services!${NC}"
@@ -209,9 +226,32 @@ else
   echo -e "${YELLOW}⚠️  Container image ID doesn't match latest${NC}"
   echo "   Running: $RUNNING_IMAGE_ID"
   echo "   Latest:  $LATEST_IMAGE_ID"
-  echo -e "${YELLOW}   This might be normal if the image was just loaded${NC}"
+  echo -e "${YELLOW}   Attempting to fix by recreating container...${NC}"
+  
+  # Try to recreate with the correct image
+  docker compose down
+  docker compose up -d --no-build
+  sleep 2
+  
+  # Check again
+  RUNNING_IMAGE_ID=$(docker inspect wms-app --format='{{.Image}}' 2>/dev/null | cut -d: -f2 | cut -c1-12)
+  if [ "$RUNNING_IMAGE_ID" = "$LATEST_IMAGE_ID" ]; then
+    echo -e "${GREEN}✅ Container now using the latest image${NC}"
+  else
+    echo -e "${YELLOW}⚠️  Image IDs still don't match - may need manual intervention${NC}"
+  fi
 fi
 echo ""
+
+# =============================================================================
+# 11. Clean up temporary files
+# =============================================================================
+if [ "$USE_OVERRIDE" = true ]; then
+  echo -e "${YELLOW}🧹 Cleaning up temporary override file...${NC}"
+  rm -f docker-compose.override.tmp.yml
+  echo -e "${GREEN}✅ Cleanup complete${NC}"
+  echo ""
+fi
 
 # =============================================================================
 # 11. Summary
