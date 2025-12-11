@@ -243,6 +243,36 @@ This application is containerized and ready for deployment on a Linux VPS using 
    docker compose ps
    ```
 
+### Remote Deployment (Recommended for VPS)
+
+For VPS servers with limited RAM (e.g., 4GB Hetzner VPS), building Docker images directly on the server can cause Out-of-Memory (OOM) crashes. Use the `deploy-remote.sh` script to build locally and ship the image to the server.
+
+**Prerequisites:**
+- SSH access to the root user on the VPS
+- Docker installed locally (on your development machine)
+- `bzip2` installed locally (usually pre-installed on Linux/macOS)
+
+**Usage:**
+
+1. **Edit the script** to set your server IP:
+   ```bash
+   nano deploy-remote.sh
+   # Set SERVER_IP="your.hetzner.ip.address"
+   ```
+
+2. **Run the deployment script**:
+   ```bash
+   ./deploy-remote.sh
+   ```
+
+The script will:
+- Build the Docker image locally (forcing `linux/amd64` platform for VPS compatibility)
+- Compress and transfer the image to the remote server via SSH
+- Load the image on the remote server without using server RAM for building
+- Restart the Docker Compose services
+
+**Note:** This method requires SSH access configured (typically using SSH keys). Ensure your SSH key is added to the server's `~/.ssh/authorized_keys` file.
+
 6. **Access the application**:
    - Application: `http://your-server-ip:3000`
    - Database: `localhost:5432` (if port is exposed)
