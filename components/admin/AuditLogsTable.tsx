@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { format } from "date-fns"
 import {
   Table,
@@ -46,15 +47,30 @@ interface User {
 
 interface AuditLogsTableProps {
   logs: AuditLog[]
+  total: number
+  page: number
+  pageSize: number
+  search?: string
   actions: string[]
   users: User[]
 }
 
-export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
+export function AuditLogsTable({
+  logs,
+  total,
+  page,
+  pageSize,
+  search,
+  actions,
+  users,
+}: AuditLogsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [filterUser, setFilterUser] = useState("all")
   const [filterAction, setFilterAction] = useState("all")
   const [filterDate, setFilterDate] = useState("")
+  const [searchTerm, setSearchTerm] = useState(search || "")
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -66,16 +82,44 @@ export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
     setExpandedRows(newExpanded)
   }
 
-  // Filter logs
-  const filteredLogs = logs.filter((log) => {
-    if (filterUser && filterUser !== "all" && log.user.id !== filterUser) return false
-    if (filterAction && filterAction !== "all" && log.action !== filterAction) return false
-    if (filterDate) {
-      const logDate = format(new Date(log.createdAt), "yyyy-MM-dd")
-      if (logDate !== filterDate) return false
-    }
-    return true
-  })
+  // Filter logs (client-side) and derive paging counts from server
+  const filteredLogs = useMemo(
+    () =>
+      logs.filter((log) => {
+        if (filterUser && filterUser !== "all" && log.user.id !== filterUser) return false
+        if (filterAction && filterAction !== "all" && log.action !== filterAction) return false
+        if (filterDate) {
+          const logDate = format(new Date(log.createdAt), "yyyy-MM-dd")
+          if (logDate !== filterDate) return false
+        }
+        return true
+      }),
+    [logs, filterUser, filterAction, filterDate]
+  )
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  const updateQuery = (next: Record<string, string | number | undefined>) => {
+    const params = new URLSearchParams(searchParams?.toString())
+    Object.entries(next).forEach(([key, value]) => {
+      if (value === undefined || value === "") {
+        params.delete(key)
+      } else {
+        params.set(key, String(value))
+      }
+    })
+    router.push(`/dashboard/admin/logs?${params.toString()}`)
+  }
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages) return
+    updateQuery({ page: nextPage })
+  }
+
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    updateQuery({ q: searchTerm || undefined, page: 1 })
+  }
 
   // Action badge colors
   const getActionBadgeColor = (action: string) => {
@@ -103,7 +147,7 @@ export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
         <CardTitle>Audit Logs</CardTitle>
         
         {/* Filters */}
-        <div className="grid grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-4 gap-4 mt-4">
           <div className="space-y-2">
             <Label>Filter by User</Label>
             <Select value={filterUser} onValueChange={setFilterUser}>
@@ -146,6 +190,20 @@ export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
               onChange={(e) => setFilterDate(e.target.value)}
             />
           </div>
+
+          <form className="space-y-2" onSubmit={handleSearchSubmit}>
+            <Label>Search (entity/action/summary)</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <Button type="submit" variant="secondary">
+                Apply
+              </Button>
+            </div>
+          </form>
         </div>
       </CardHeader>
 
@@ -242,7 +300,26 @@ export function AuditLogsTable({ logs, actions, users }: AuditLogsTableProps) {
         </Table>
 
         <div className="mt-4 text-sm text-muted-foreground">
-          Showing {filteredLogs.length} of {logs.length} total logs
+          Showing {filteredLogs.length} of {logs.length} on this page • Total {total} logs
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => handlePageChange(page - 1)} disabled={page <= 1}>
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page >= totalPages}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

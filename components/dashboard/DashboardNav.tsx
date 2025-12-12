@@ -148,7 +148,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
           <div className="flex h-16 shrink-0 items-center border-b border-gray-200 dark:border-gray-700 -mx-6 px-6">
             <BoxIcon className="h-8 w-8 text-blue-600" />
             <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">
-              WMS
+              PalettaHub
             </span>
           </div>
 

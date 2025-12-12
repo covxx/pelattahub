@@ -5,14 +5,14 @@ export default function TermsPage() {
         <p className="text-sm uppercase tracking-wide text-muted-foreground">Legal</p>
         <h1 className="text-3xl font-bold">Terms &amp; Conditions</h1>
         <p className="text-muted-foreground">
-          Rules for using the Warehouse Management System.
+          Rules for using PalettaHub.
         </p>
       </header>
 
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Acceptance</h2>
         <p className="text-muted-foreground">
-          By accessing or using the WMS, you agree to these Terms. If you use the service on behalf
+          By accessing or using PalettaHub, you agree to these Terms. If you use the service on behalf
           of a company, you confirm you have authority to bind that company.
         </p>
       </section>
@@ -53,7 +53,7 @@ export default function TermsPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Disclaimers</h2>
         <p className="text-muted-foreground">
-          The WMS is provided “as is” without warranties of fitness for a particular purpose. Users
+          PalettaHub is provided “as is” without warranties of fitness for a particular purpose. Users
           are responsible for validating operational outputs (e.g., labels, lot allocations).
         </p>
       </section>

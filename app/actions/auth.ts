@@ -66,7 +66,7 @@ export async function requestPasswordReset(input: { email: string }) {
 
   await sendEmail({
     to: user.email,
-    subject: "Reset your WMS password",
+    subject: "Reset your PalettaHub password",
     text: [
       "You requested a password reset.",
       `Reset link: ${resetUrl}`,

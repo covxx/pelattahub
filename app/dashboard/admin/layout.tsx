@@ -52,6 +52,11 @@ export default async function AdminLayout({
               📋 System Logs
             </AdminNavLink>
           )}
+          {session.user.role === "ADMIN" && (
+            <AdminNavLink href="/dashboard/admin/recall">
+              🚨 Recall
+            </AdminNavLink>
+          )}
           <AdminNavLink href="/dashboard/admin/traceability">
             🔍 Traceability
           </AdminNavLink>

@@ -4,7 +4,7 @@
 # Run this script on the production server after deploy-remote.sh completes
 # Usage: ./post-deploy.sh
 
-set -e  # Exit on error
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,6 +16,101 @@ NC='\033[0m' # No Color
 # Configuration
 PROJECT_DIR="${PROJECT_DIR:-$HOME/opt/pelattahub}"
 HEALTH_URL="${HEALTH_URL:-http://localhost:3000/api/health}"
+SERVER_IP="${SERVER_IP:-178.156.221.237}"
+SSH_USER="${SSH_USER:-root}"
+SSH_OPTS="${SSH_OPTS:-}"
+REMOTE_HOST="${REMOTE_HOST:-${SSH_USER}@${SERVER_IP}}"
+
+MAINTENANCE_CAN_DISABLE=false
+MAINTENANCE_DISABLED=false
+MAINTENANCE_PATH="/etc/nginx/maintenance.on"
+
+maintenance_exists() {
+  if [ "${USE_SSH_MAINTENANCE:-false}" = "true" ]; then
+    ssh $SSH_OPTS "$REMOTE_HOST" "test -f $MAINTENANCE_PATH" >/dev/null 2>&1
+  else
+    test -f "$MAINTENANCE_PATH"
+  fi
+}
+
+disable_maintenance() {
+  local result=0
+  # Default to local disable when running on the server; fall back to SSH if requested
+  if [ "${USE_SSH_MAINTENANCE:-false}" = "true" ]; then
+    ssh $SSH_OPTS "$REMOTE_HOST" "sudo rm -f $MAINTENANCE_PATH && sudo systemctl reload nginx" || result=$?
+  else
+    sudo rm -f "$MAINTENANCE_PATH" && sudo systemctl reload nginx || result=$?
+  fi
+
+  if [ $result -ne 0 ]; then
+    echo -e "${RED}❌ Failed to remove maintenance flag or reload nginx (exit $result)${NC}"
+    return $result
+  fi
+
+  if maintenance_exists; then
+    echo -e "${RED}❌ Maintenance flag still present at $MAINTENANCE_PATH after disable attempt${NC}"
+    return 1
+  fi
+
+  echo -e "${GREEN}✅ Maintenance flag removed and nginx reloaded${NC}"
+  MAINTENANCE_DISABLED=true
+}
+
+cleanup() {
+  if maintenance_exists; then
+    echo -e "${YELLOW}🛡️  Disabling maintenance mode (cleanup)...${NC}"
+    if ! disable_maintenance; then
+      echo -e "${RED}⚠️  Maintenance disable failed during cleanup${NC}"
+    elif maintenance_exists; then
+      echo -e "${RED}⚠️  Maintenance flag still present at $MAINTENANCE_PATH${NC}"
+    else
+      echo -e "${GREEN}✅ Maintenance mode disabled${NC}"
+    fi
+  fi
+}
+
+cleanup_old_images() {
+  echo -e "${YELLOW}🧹 Cleaning up old wms-app images (keeping latest two)...${NC}"
+  # docker images is sorted by creation date desc by default
+  mapfile -t IMAGES < <(docker images wms-app --format "{{.ID}}" | uniq)
+  if [ "${#IMAGES[@]}" -le 2 ]; then
+    echo -e "${GREEN}✅ No old images to remove${NC}"
+    return
+  fi
+
+  # Keep the first two (newest), remove the rest
+  OLD_IMAGES=("${IMAGES[@]:2}")
+  for IMG in "${OLD_IMAGES[@]}"; do
+    echo " - Removing image $IMG"
+    docker rmi "$IMG" >/dev/null 2>&1 || true
+  done
+
+  echo -e "${GREEN}✅ Old images cleaned up${NC}"
+}
+
+ensure_maintenance_off() {
+  if ! maintenance_exists; then
+    echo -e "${GREEN}✅ Maintenance flag not present${NC}"
+    return
+  fi
+
+  echo -e "${YELLOW}🛡️  Attempting to clear maintenance flag...${NC}"
+  for attempt in 1 2 3; do
+    if disable_maintenance; then
+      break
+    fi
+    echo -e "${YELLOW}Retrying maintenance disable (attempt $attempt/3)...${NC}"
+    sleep 1
+  done
+
+  if maintenance_exists; then
+    echo -e "${RED}❌ Maintenance flag still present at $MAINTENANCE_PATH after retries${NC}"
+  else
+    echo -e "${GREEN}✅ Maintenance flag removed${NC}"
+  fi
+}
+
+trap cleanup EXIT
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Post-Deployment Verification${NC}"
@@ -169,6 +264,16 @@ HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -n1)
 BODY=$(echo "$HEALTH_RESPONSE" | head -n-1)
 
 if [ "$HTTP_CODE" = "200" ]; then
+  MAINTENANCE_CAN_DISABLE=true
+  # Disable immediately after successful health, trap provides a safety net
+  echo -e "${YELLOW}🛡️  Disabling maintenance mode after health pass...${NC}"
+  if maintenance_exists; then
+    if ! disable_maintenance; then
+      echo -e "${RED}⚠️  Failed to disable maintenance after health pass${NC}"
+    fi
+  else
+    echo -e "${GREEN}✅ Maintenance flag already absent${NC}"
+  fi
   echo -e "${GREEN}✅ Health check passed (HTTP $HTTP_CODE)${NC}"
   echo "   Response: $BODY"
 else
@@ -254,7 +359,17 @@ if [ "$USE_OVERRIDE" = true ]; then
 fi
 
 # =============================================================================
-# 11. Summary
+# 12. Remove old images (keep two most recent)
+# =============================================================================
+cleanup_old_images
+
+# =============================================================================
+# 13. Ensure maintenance flag is cleared
+# =============================================================================
+ensure_maintenance_off
+
+# =============================================================================
+# 14. Summary
 # =============================================================================
 echo -e "${BLUE}========================================${NC}"
 echo -e "${GREEN}✅ Post-Deployment Verification Complete${NC}"
@@ -265,6 +380,11 @@ echo "  • Image: Loaded and verified"
 echo "  • Services: Running with latest image"
 echo "  • Migrations: Completed"
 echo "  • Health Check: Passed"
+if maintenance_exists; then
+  echo "  • Maintenance Flag: PRESENT at $MAINTENANCE_PATH (requires manual removal)"
+else
+  echo "  • Maintenance Flag: Not present"
+fi
 echo ""
 echo -e "${BLUE}Useful commands:${NC}"
 echo "  • View logs: docker compose logs -f app"
