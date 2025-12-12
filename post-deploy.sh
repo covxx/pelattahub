@@ -88,6 +88,28 @@ cleanup_old_images() {
   echo -e "${GREEN}✅ Old images cleaned up${NC}"
 }
 
+ensure_maintenance_off() {
+  if ! maintenance_exists; then
+    echo -e "${GREEN}✅ Maintenance flag not present${NC}"
+    return
+  fi
+
+  echo -e "${YELLOW}🛡️  Attempting to clear maintenance flag...${NC}"
+  for attempt in 1 2 3; do
+    if disable_maintenance; then
+      break
+    fi
+    echo -e "${YELLOW}Retrying maintenance disable (attempt $attempt/3)...${NC}"
+    sleep 1
+  done
+
+  if maintenance_exists; then
+    echo -e "${RED}❌ Maintenance flag still present at $MAINTENANCE_PATH after retries${NC}"
+  else
+    echo -e "${GREEN}✅ Maintenance flag removed${NC}"
+  fi
+}
+
 trap cleanup EXIT
 
 echo -e "${BLUE}========================================${NC}"
@@ -342,7 +364,12 @@ fi
 cleanup_old_images
 
 # =============================================================================
-# 13. Summary
+# 13. Ensure maintenance flag is cleared
+# =============================================================================
+ensure_maintenance_off
+
+# =============================================================================
+# 14. Summary
 # =============================================================================
 echo -e "${BLUE}========================================${NC}"
 echo -e "${GREEN}✅ Post-Deployment Verification Complete${NC}"
