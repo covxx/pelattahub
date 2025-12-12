@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import ContactForm from "@/components/landing/ContactForm";
+
 const featureHighlights: { title: string; description: string; detail: string }[] = [
   {
     title: "PTI-Ready Lot Tracking",
@@ -74,10 +76,10 @@ export default function LandingPage() {
                   Sign in to PalettaHub
                 </Link>
                 <Link
-                  href="mailto:sales@srjlabs.com"
+                  href="#contact"
                   className="inline-flex items-center justify-center rounded-full border px-5 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-foreground"
                 >
-                  Contact us
+                  Talk to our team
                 </Link>
                 <Link
                   href="/privacy"
@@ -196,6 +198,29 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section id="contact" className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
+        <div className="grid gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-start">
+          <div className="space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Contact</p>
+            <h3 className="text-2xl font-semibold sm:text-3xl">Get a walkthrough of PalettaHub</h3>
+            <p className="text-lg text-muted-foreground">
+              Tell us about your receiving, picking, or labeling needs. We&apos;ll set up a short call and share how we keep PTI compliance, audit trails, and
+              CASE/LBS accuracy baked into every workflow.
+            </p>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>• PTI-ready labels (GTIN, lot, voice pick code)</li>
+              <li>• FIFO-first picking and lot holds</li>
+              <li>• Zero-silent-write audit logs on every change</li>
+              <li>• QuickBooks Online integration for orders and invoices</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border bg-card p-6 shadow-lg shadow-primary/10">
+            <div className="mb-4 text-sm font-semibold text-primary">Reach out</div>
+            <ContactForm />
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
         <div className="rounded-3xl border bg-gradient-to-r from-primary to-foreground px-6 py-10 text-background shadow-xl sm:px-10 sm:py-14">
           <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
@@ -213,10 +238,10 @@ export default function LandingPage() {
                 Sign in
               </Link>
               <Link
-                href="mailto:sales@srjlabs.com"
+                href="#contact"
                 className="inline-flex items-center justify-center rounded-full border border-background/40 px-5 py-3 text-sm font-semibold text-background transition hover:-translate-y-0.5 hover:border-background"
               >
-                Contact us
+                Talk to our team
               </Link>
               <Link
                 href="/terms"
