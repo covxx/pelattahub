@@ -215,11 +215,13 @@ echo -e "${YELLOW}📊 Checking service status...${NC}"
 docker compose ps
 
 # Check if services are running - use multiple methods for reliability
-SERVICES_UP=$(docker compose ps --format json 2>/dev/null | jq -r 'select(.State == "running") | .Name' 2>/dev/null | wc -l || echo "0")
+SERVICES_UP=$(docker compose ps --format json 2>/dev/null | jq -r 'select(.State == "running") | .Name' 2>/dev/null | wc -l | tr -dc '0-9')
+if [ -z "$SERVICES_UP" ]; then SERVICES_UP=0; fi
 
 # Alternative check: count containers with "Up" status
 if [ "$SERVICES_UP" -eq 0 ]; then
-  SERVICES_UP=$(docker compose ps 2>/dev/null | grep -c "Up" || echo "0")
+  SERVICES_UP=$(docker compose ps 2>/dev/null | grep -c "Up" | tr -dc '0-9')
+  if [ -z "$SERVICES_UP" ]; then SERVICES_UP=0; fi
 fi
 
 # Final check: verify container exists and is running
