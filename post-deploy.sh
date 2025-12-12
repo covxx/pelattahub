@@ -55,6 +55,25 @@ cleanup() {
   fi
 }
 
+cleanup_old_images() {
+  echo -e "${YELLOW}🧹 Cleaning up old wms-app images (keeping latest two)...${NC}"
+  # docker images is sorted by creation date desc by default
+  mapfile -t IMAGES < <(docker images wms-app --format "{{.ID}}" | uniq)
+  if [ "${#IMAGES[@]}" -le 2 ]; then
+    echo -e "${GREEN}✅ No old images to remove${NC}"
+    return
+  fi
+
+  # Keep the first two (newest), remove the rest
+  OLD_IMAGES=("${IMAGES[@]:2}")
+  for IMG in "${OLD_IMAGES[@]}"; do
+    echo " - Removing image $IMG"
+    docker rmi "$IMG" >/dev/null 2>&1 || true
+  done
+
+  echo -e "${GREEN}✅ Old images cleaned up${NC}"
+}
+
 trap cleanup EXIT
 
 echo -e "${BLUE}========================================${NC}"
@@ -302,7 +321,12 @@ if [ "$USE_OVERRIDE" = true ]; then
 fi
 
 # =============================================================================
-# 11. Summary
+# 12. Remove old images (keep two most recent)
+# =============================================================================
+cleanup_old_images
+
+# =============================================================================
+# 13. Summary
 # =============================================================================
 echo -e "${BLUE}========================================${NC}"
 echo -e "${GREEN}✅ Post-Deployment Verification Complete${NC}"
