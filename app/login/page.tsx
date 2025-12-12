@@ -58,7 +58,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder="user@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -104,7 +104,7 @@ export default function LoginPage() {
                 Default Credentials:
               </p>
               <p className="text-blue-800 dark:text-blue-300">
-                Email: admin@example.com
+                Email: user@example.com
                 <br />
                 Password: admin123
               </p>
