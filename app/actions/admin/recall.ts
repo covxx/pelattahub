@@ -281,11 +281,14 @@ export async function generateRecallReport(input: {
       where: {
         OR: [
           { lot_number: parsed.lotNumber },
+          { lot_number: { equals: parsed.lotNumber, mode: "insensitive" } },
           { lot_number: { contains: parsed.lotNumber, mode: "insensitive" } },
+          { lot_number: { startsWith: parsed.lotNumber, mode: "insensitive" } },
           { id: parsed.lotNumber },
         ],
       },
       include: lotInclude,
+      orderBy: { createdAt: "desc" },
     })
 
     if (!lot) {
