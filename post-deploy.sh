@@ -23,22 +23,35 @@ REMOTE_HOST="${REMOTE_HOST:-${SSH_USER}@${SERVER_IP}}"
 
 MAINTENANCE_CAN_DISABLE=false
 MAINTENANCE_DISABLED=false
+MAINTENANCE_PATH="/etc/nginx/maintenance.on"
+
+maintenance_exists() {
+  if [ "${USE_SSH_MAINTENANCE:-false}" = "true" ]; then
+    ssh $SSH_OPTS "$REMOTE_HOST" "test -f $MAINTENANCE_PATH" >/dev/null 2>&1
+  else
+    test -f "$MAINTENANCE_PATH"
+  fi
+}
 
 disable_maintenance() {
   # Default to local disable when running on the server; fall back to SSH if requested
   if [ "${USE_SSH_MAINTENANCE:-false}" = "true" ]; then
-    ssh $SSH_OPTS "$REMOTE_HOST" 'sudo rm -f /etc/nginx/maintenance.on && sudo systemctl reload nginx'
+    ssh $SSH_OPTS "$REMOTE_HOST" "sudo rm -f $MAINTENANCE_PATH && sudo systemctl reload nginx"
   else
-    sudo rm -f /etc/nginx/maintenance.on && sudo systemctl reload nginx
+    sudo rm -f "$MAINTENANCE_PATH" && sudo systemctl reload nginx
   fi
   MAINTENANCE_DISABLED=true
 }
 
 cleanup() {
-  if [ "$MAINTENANCE_CAN_DISABLE" = true ] && [ "$MAINTENANCE_DISABLED" != true ]; then
-    echo -e "${YELLOW}🛡️  Disabling maintenance mode...${NC}"
-    disable_maintenance
-    echo -e "${GREEN}✅ Maintenance mode disabled${NC}"
+  if maintenance_exists; then
+    echo -e "${YELLOW}🛡️  Disabling maintenance mode (cleanup)...${NC}"
+    disable_maintenance || true
+    if maintenance_exists; then
+      echo -e "${RED}⚠️  Maintenance flag still present at $MAINTENANCE_PATH${NC}"
+    else
+      echo -e "${GREEN}✅ Maintenance mode disabled${NC}"
+    fi
   fi
 }
 
@@ -199,7 +212,11 @@ if [ "$HTTP_CODE" = "200" ]; then
   MAINTENANCE_CAN_DISABLE=true
   # Disable immediately after successful health, trap provides a safety net
   echo -e "${YELLOW}🛡️  Disabling maintenance mode after health pass...${NC}"
-  disable_maintenance
+  if maintenance_exists; then
+    disable_maintenance
+  else
+    echo -e "${GREEN}✅ Maintenance flag already absent${NC}"
+  fi
   echo -e "${GREEN}✅ Health check passed (HTTP $HTTP_CODE)${NC}"
   echo "   Response: $BODY"
 else
