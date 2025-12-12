@@ -5,7 +5,7 @@ export default function PrivacyPolicyPage() {
         <p className="text-sm uppercase tracking-wide text-muted-foreground">Legal</p>
         <h1 className="text-3xl font-bold">Privacy Policy</h1>
         <p className="text-muted-foreground">
-          How we collect, use, and protect information in the WMS.
+          How we collect, use, and protect information in PalettaHub.
         </p>
       </header>
 

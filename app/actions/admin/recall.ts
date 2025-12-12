@@ -189,11 +189,17 @@ type OrderWithPicks = Prisma.OrderGetPayload<{
 }>
 
 function mapAuditLogs(logs: AuditLogWithUser[]): RecallAuditEntry[] {
+  const extractSummary = (details: Prisma.JsonValue | null | undefined): string | undefined => {
+    if (!details || typeof details !== "object" || Array.isArray(details)) return undefined
+    const maybeSummary = (details as Record<string, unknown>).summary
+    return typeof maybeSummary === "string" ? maybeSummary : undefined
+  }
+
   return logs.map((log) => ({
     id: log.id,
     action: log.action,
     createdAt: log.createdAt.toISOString(),
-    summary: log.details?.summary,
+    summary: extractSummary(log.details),
     user: {
       name: log.user?.name ?? null,
       email: log.user?.email ?? "unknown",
@@ -203,25 +209,25 @@ function mapAuditLogs(logs: AuditLogWithUser[]): RecallAuditEntry[] {
 }
 
 function mapLot(lot: LotWithRelations): RecallLotSummary {
-  const orders =
-    lot.picks?.map((pick) => {
-      const order = pick.order_item?.order
-      return {
-        orderId: order?.id ?? "unknown",
-        orderNumber: order?.order_number ?? null,
-        poNumber: order?.po_number ?? null,
-        customerName: order?.customer?.name ?? "Unknown Customer",
-        deliveryDate: order?.delivery_date
-          ? new Date(order.delivery_date).toISOString()
-          : "",
-        quantityPicked: Number(pick.quantity_picked ?? 0),
-        unitType: pick.inventory_lot?.product?.unit_type ?? "units",
-      }
-    }) ?? []
+  const picks = Array.isArray(lot.picks) ? lot.picks : []
+
+  const orders = picks.map((pick) => {
+    const order = pick.order_item?.order
+    return {
+      orderId: order?.id ?? "unknown",
+      orderNumber: order?.order_number ?? null,
+      poNumber: order?.po_number ?? null,
+      customerName: order?.customer?.name ?? "Unknown Customer",
+      deliveryDate: order?.delivery_date ? new Date(order.delivery_date).toISOString() : "",
+      quantityPicked: Number(pick.quantity_picked ?? 0),
+      unitType: pick.inventory_lot?.product?.unit_type ?? "units",
+    }
+  })
 
   const productionRuns: RecallProductionRun[] = []
 
-  (lot.sourceProductionRuns ?? []).forEach((run) => {
+  const sourceRuns = Array.isArray(lot.sourceProductionRuns) ? lot.sourceProductionRuns : []
+  for (const run of sourceRuns) {
     productionRuns.push({
       id: run.id,
       direction: "SOURCE",
@@ -230,9 +236,10 @@ function mapLot(lot: LotWithRelations): RecallLotSummary {
       peerLotNumber: run.destinationLot?.lot_number,
       peerProductName: run.destinationLot?.product?.name,
     })
-  })
+  }
 
-  (lot.destinationProductionRuns ?? []).forEach((run) => {
+  const destRuns = Array.isArray(lot.destinationProductionRuns) ? lot.destinationProductionRuns : []
+  for (const run of destRuns) {
     productionRuns.push({
       id: run.id,
       direction: "DESTINATION",
@@ -241,7 +248,7 @@ function mapLot(lot: LotWithRelations): RecallLotSummary {
       peerLotNumber: run.sourceLot?.lot_number,
       peerProductName: run.sourceLot?.product?.name,
     })
-  })
+  }
 
   return {
     id: lot.id,

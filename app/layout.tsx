@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WMS - Warehouse Management System",
-  description: "Warehouse Management System for Fresh Produce",
+  title: "PalettaHub | Warehouse Management System",
+  description: "PalettaHub — PTI-first warehouse management for fresh produce.",
 };
 
 export default function RootLayout({

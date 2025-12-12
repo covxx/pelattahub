@@ -63,8 +63,8 @@ export function SystemHealthDashboard({ initialHealth }: SystemHealthDashboardPr
         const result = await runGarbageCollection()
         if (result.success) {
           // Refresh health after GC
-          const newHealth = await getSystemHealth()
-          setHealth(newHealth)
+            const newHealth = await getSystemHealth()
+            setHealth(newHealth)
         }
       } catch (error) {
         console.error("Failed to run garbage collection:", error)

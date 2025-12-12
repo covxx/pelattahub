@@ -23,3 +23,12 @@ NEXT_PUBLIC_COMPANY_ADDRESS="1234 Produce Lane, Salinas, CA"
 # Application Configuration
 NODE_ENV="production"
 
+# Email (Google Workspace SMTP)
+# Use an App Password for EMAIL_PASSWORD (2FA required)
+SALES_EMAIL="sales@srjlabs.com"
+EMAIL_HOST="smtp.gmail.com"
+EMAIL_PORT="465" # use 587 for STARTTLS
+EMAIL_USER="sales@srjlabs.com"
+EMAIL_PASSWORD="REPLACE_WITH_APP_PASSWORD"
+EMAIL_FROM="sales@srjlabs.com"
+

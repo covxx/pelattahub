@@ -22,13 +22,20 @@ SSH_OPTS="${SSH_OPTS:-}"
 REMOTE_HOST="${REMOTE_HOST:-${SSH_USER}@${SERVER_IP}}"
 
 MAINTENANCE_CAN_DISABLE=false
+MAINTENANCE_DISABLED=false
 
 disable_maintenance() {
-  ssh $SSH_OPTS "$REMOTE_HOST" 'sudo rm -f /etc/nginx/maintenance.on && sudo systemctl reload nginx'
+  # Default to local disable when running on the server; fall back to SSH if requested
+  if [ "${USE_SSH_MAINTENANCE:-false}" = "true" ]; then
+    ssh $SSH_OPTS "$REMOTE_HOST" 'sudo rm -f /etc/nginx/maintenance.on && sudo systemctl reload nginx'
+  else
+    sudo rm -f /etc/nginx/maintenance.on && sudo systemctl reload nginx
+  fi
+  MAINTENANCE_DISABLED=true
 }
 
 cleanup() {
-  if [ "$MAINTENANCE_CAN_DISABLE" = true ]; then
+  if [ "$MAINTENANCE_CAN_DISABLE" = true ] && [ "$MAINTENANCE_DISABLED" != true ]; then
     echo -e "${YELLOW}🛡️  Disabling maintenance mode...${NC}"
     disable_maintenance
     echo -e "${GREEN}✅ Maintenance mode disabled${NC}"
@@ -190,6 +197,9 @@ BODY=$(echo "$HEALTH_RESPONSE" | head -n-1)
 
 if [ "$HTTP_CODE" = "200" ]; then
   MAINTENANCE_CAN_DISABLE=true
+  # Disable immediately after successful health, trap provides a safety net
+  echo -e "${YELLOW}🛡️  Disabling maintenance mode after health pass...${NC}"
+  disable_maintenance
   echo -e "${GREEN}✅ Health check passed (HTTP $HTTP_CODE)${NC}"
   echo "   Response: $BODY"
 else
