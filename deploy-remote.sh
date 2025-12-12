@@ -40,7 +40,7 @@ fi
 # BUILD LOCALLY
 # =============================================================================
 echo "🔨 Building Docker image locally (amd64 platform)..."
-docker build --platform linux/amd64 -t wms-app .
+docker build --platform linux/amd64 --no-cache -t wms-app .
 
 if [ $? -ne 0 ]; then
   echo "❌ Build failed!"
