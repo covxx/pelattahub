@@ -215,17 +215,19 @@ echo -e "${YELLOW}📊 Checking service status...${NC}"
 docker compose ps
 
 # Check if services are running - use multiple methods for reliability
-SERVICES_UP=$(docker compose ps --format json 2>/dev/null | jq -r 'select(.State == "running") | .Name' 2>/dev/null | wc -l | tr -dc '0-9')
+SERVICES_UP=$(docker compose ps --format json 2>/dev/null | jq -r '.[] | select(.State == "running") | .Name' 2>/dev/null | wc -l | tr -dc '0-9')
+SERVICES_UP=${SERVICES_UP//[!0-9]/}
 if [ -z "$SERVICES_UP" ]; then SERVICES_UP=0; fi
 
 # Alternative check: count containers with "Up" status
-if [ "$SERVICES_UP" -eq 0 ]; then
+if [ "${SERVICES_UP:-0}" -eq 0 ] 2>/dev/null; then
   SERVICES_UP=$(docker compose ps 2>/dev/null | grep -c "Up" | tr -dc '0-9')
+  SERVICES_UP=${SERVICES_UP//[!0-9]/}
   if [ -z "$SERVICES_UP" ]; then SERVICES_UP=0; fi
 fi
 
 # Final check: verify container exists and is running
-if [ "$SERVICES_UP" -eq 0 ]; then
+if [ "${SERVICES_UP:-0}" -eq 0 ] 2>/dev/null; then
   # Check if wms-app container exists and is running
   if docker ps --filter "name=wms-app" --format "{{.Status}}" | grep -q "Up"; then
     SERVICES_UP=1
