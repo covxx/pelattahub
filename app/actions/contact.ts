@@ -43,7 +43,8 @@ export async function submitContact(prevState: ContactFormState, formData: FormD
     return { success: false, error: "Contact email is not configured. Set SALES_EMAIL or EMAIL_FROM." }
   }
 
-  const referer = headers().get("origin") ?? headers().get("referer") ?? "unknown"
+  const requestHeaders = await headers()
+  const referer = requestHeaders.get("origin") ?? requestHeaders.get("referer") ?? "unknown"
 
   try {
     await sendEmail({
