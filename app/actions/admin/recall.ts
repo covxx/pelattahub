@@ -277,8 +277,14 @@ export async function generateRecallReport(input: {
   const parsed = recallInputSchema.parse(input)
 
   if (parsed.lotNumber) {
-    const lot = await prisma.inventoryLot.findUnique({
-      where: { lot_number: parsed.lotNumber },
+    const lot = await prisma.inventoryLot.findFirst({
+      where: {
+        OR: [
+          { lot_number: parsed.lotNumber },
+          { lot_number: { contains: parsed.lotNumber, mode: "insensitive" } },
+          { id: parsed.lotNumber },
+        ],
+      },
       include: lotInclude,
     })
 
@@ -308,6 +314,8 @@ export async function generateRecallReport(input: {
       OR: [
         { order_number: parsed.orderNumber },
         { po_number: parsed.orderNumber },
+        { order_number: { contains: parsed.orderNumber, mode: "insensitive" } },
+        { po_number: { contains: parsed.orderNumber, mode: "insensitive" } },
       ],
     },
     include: orderInclude,
