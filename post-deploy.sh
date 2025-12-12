@@ -380,6 +380,11 @@ echo "  • Image: Loaded and verified"
 echo "  • Services: Running with latest image"
 echo "  • Migrations: Completed"
 echo "  • Health Check: Passed"
+if maintenance_exists; then
+  echo "  • Maintenance Flag: PRESENT at $MAINTENANCE_PATH (requires manual removal)"
+else
+  echo "  • Maintenance Flag: Not present"
+fi
 echo ""
 echo -e "${BLUE}Useful commands:${NC}"
 echo "  • View logs: docker compose logs -f app"
