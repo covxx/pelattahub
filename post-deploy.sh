@@ -4,7 +4,7 @@
 # Run this script on the production server after deploy-remote.sh completes
 # Usage: ./post-deploy.sh
 
-set -e  # Exit on error
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,6 +16,26 @@ NC='\033[0m' # No Color
 # Configuration
 PROJECT_DIR="${PROJECT_DIR:-$HOME/opt/pelattahub}"
 HEALTH_URL="${HEALTH_URL:-http://localhost:3000/api/health}"
+SERVER_IP="${SERVER_IP:-178.156.221.237}"
+SSH_USER="${SSH_USER:-root}"
+SSH_OPTS="${SSH_OPTS:-}"
+REMOTE_HOST="${REMOTE_HOST:-${SSH_USER}@${SERVER_IP}}"
+
+MAINTENANCE_CAN_DISABLE=false
+
+disable_maintenance() {
+  ssh $SSH_OPTS "$REMOTE_HOST" 'sudo rm -f /etc/nginx/maintenance.on && sudo systemctl reload nginx'
+}
+
+cleanup() {
+  if [ "$MAINTENANCE_CAN_DISABLE" = true ]; then
+    echo -e "${YELLOW}🛡️  Disabling maintenance mode...${NC}"
+    disable_maintenance
+    echo -e "${GREEN}✅ Maintenance mode disabled${NC}"
+  fi
+}
+
+trap cleanup EXIT
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Post-Deployment Verification${NC}"
@@ -169,6 +189,7 @@ HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -n1)
 BODY=$(echo "$HEALTH_RESPONSE" | head -n-1)
 
 if [ "$HTTP_CODE" = "200" ]; then
+  MAINTENANCE_CAN_DISABLE=true
   echo -e "${GREEN}✅ Health check passed (HTTP $HTTP_CODE)${NC}"
   echo "   Response: $BODY"
 else

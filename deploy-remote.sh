@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Remote Deployment Script
 # Builds Docker image locally and ships it to the remote server
 # This prevents OOM crashes on the VPS by building on a machine with more RAM
@@ -8,13 +10,23 @@
 # CONFIGURATION
 # =============================================================================
 # Set your Hetzner VPS IP address here
-SERVER_IP="YOUR_HETZNER_IP_HERE"
+SERVER_IP="178.156.221.237"
 
 # Set the SSH user (typically 'root' for VPS)
 SSH_USER="root"
 
+# SSH options (e.g., "-i /path/to/key -o StrictHostKeyChecking=no")
+SSH_OPTS="${SSH_OPTS:-}"
+
+# Convenience host target for SSH commands
+REMOTE_HOST="${REMOTE_HOST:-${SSH_USER}@${SERVER_IP}}"
+
 # Set the remote project directory
 REMOTE_DIR="~/opt/pelattahub"
+
+enable_maintenance() {
+  ssh $SSH_OPTS "$REMOTE_HOST" 'sudo touch /etc/nginx/maintenance.on && sudo systemctl reload nginx'
+}
 
 # =============================================================================
 # VALIDATION
@@ -43,7 +55,7 @@ echo "✅ Build complete!"
 echo "📦 Shipping Docker image to remote server..."
 echo "   This may take a few minutes depending on image size and connection speed..."
 
-docker save wms-app | bzip2 | ssh ${SSH_USER}@${SERVER_IP} "cd ${REMOTE_DIR} && bunzip2 | docker load"
+docker save wms-app | bzip2 | ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && bunzip2 | docker load"
 
 if [ $? -ne 0 ]; then
   echo "❌ Failed to transfer image to remote server!"
@@ -55,9 +67,13 @@ echo "✅ Image transferred successfully!"
 # =============================================================================
 # RESTART REMOTE SERVICES
 # =============================================================================
+echo "🛡️ Enabling maintenance mode on remote server..."
+enable_maintenance
+echo "✅ Maintenance mode enabled."
+
 echo "🚀 Restarting services on remote server..."
 
-ssh ${SSH_USER}@${SERVER_IP} "cd ${REMOTE_DIR} && docker compose up -d"
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose up -d"
 
 if [ $? -ne 0 ]; then
   echo "❌ Failed to restart services on remote server!"
@@ -67,7 +83,7 @@ fi
 echo "✅ Deployment complete!"
 echo ""
 echo "📊 Checking service status..."
-ssh ${SSH_USER}@${SERVER_IP} "cd ${REMOTE_DIR} && docker compose ps"
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose ps"
 
 echo ""
 echo "📋 Next steps on production server:"
