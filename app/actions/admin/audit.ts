@@ -24,6 +24,8 @@ export async function getAuditLogs(filters?: {
   startDate?: Date
   endDate?: Date
   limit?: number
+  page?: number
+  search?: string
 }) {
   await requireAdmin()
 
@@ -41,11 +43,32 @@ export async function getAuditLogs(filters?: {
     where.entity_type = filters.entityType
   }
 
+  if (filters?.search) {
+    const search = filters.search.trim()
+    if (search.length > 0) {
+      where.OR = [
+        { entity_id: { contains: search, mode: "insensitive" } },
+        { entity_type: { contains: search, mode: "insensitive" } },
+        { action: { contains: search, mode: "insensitive" } },
+        { user: { name: { contains: search, mode: "insensitive" } } },
+        { user: { email: { contains: search, mode: "insensitive" } } },
+        // Try to match summary inside details JSON if available
+        { details: { path: ["summary"], string_contains: search } },
+      ]
+    }
+  }
+
   if (filters?.startDate || filters?.endDate) {
     where.createdAt = {}
     if (filters.startDate) where.createdAt.gte = filters.startDate
     if (filters.endDate) where.createdAt.lte = filters.endDate
   }
+
+  const take = filters?.limit && filters.limit > 0 ? filters.limit : 100
+  const page = filters?.page && filters.page > 0 ? filters.page : 1
+  const skip = (page - 1) * take
+
+  const total = await prisma.auditLog.count({ where })
 
   const logs = await prisma.auditLog.findMany({
     where,
@@ -62,10 +85,16 @@ export async function getAuditLogs(filters?: {
     orderBy: {
       createdAt: "desc",
     },
-    take: filters?.limit || 100,
+    skip,
+    take,
   })
 
-  return logs
+  return {
+    logs,
+    total,
+    page,
+    limit: take,
+  }
 }
 
 /**
