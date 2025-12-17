@@ -802,7 +802,7 @@ export async function runManualFullSync() {
       }
     }
 
-    logger.info(`Manual full sync started by user ${session.user.id}`)
+    console.log(`Manual full sync started by user ${session.user.id}`)
 
     const results = {
       customers: null as any,
