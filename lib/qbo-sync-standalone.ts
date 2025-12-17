@@ -17,6 +17,31 @@ import {
 } from "@/lib/qbo"
 
 /**
+ * Resolve a valid system user ID for audit logging
+ * Finds an existing admin/manager user since audit logs require valid user_id
+ */
+async function resolveSystemUserId(): Promise<string> {
+  // Try to find an admin user first
+  const adminUser = await prisma.user.findFirst({
+    where: { role: "ADMIN" } as any,
+    orderBy: { createdAt: "asc" },
+  })
+
+  if (adminUser) return adminUser.id
+
+  // Fallback to manager user
+  const managerUser = await prisma.user.findFirst({
+    where: { role: "MANAGER" } as any,
+    orderBy: { createdAt: "asc" },
+  })
+
+  if (managerUser) return managerUser.id
+
+  // If no admin/manager found, this is a critical error
+  throw new Error("No admin or manager user found for system audit logging. Please ensure at least one admin user exists.")
+}
+
+/**
  * Check QBO connection status (standalone version)
  */
 export async function getQboStatus() {
@@ -45,7 +70,7 @@ export async function importQboCustomers() {
       }
     }
 
-    const userId = 'system' // System user for automated syncs
+    const userId = await resolveSystemUserId() // Valid admin/manager user for audit logging
 
     // Fetch customers from QBO (with fallback if lastSync yields zero)
     const lastSync = await getLastSyncTimestamp("customers")
@@ -152,7 +177,7 @@ export async function importQboItems() {
       }
     }
 
-    const userId = 'system' // System user for automated syncs
+    const userId = await resolveSystemUserId() // Valid admin/manager user for audit logging
 
     // Fetch items from QBO
     const lastSync = await getLastSyncTimestamp("items")
@@ -282,7 +307,7 @@ export async function importQboVendors() {
       }
     }
 
-    const userId = 'system' // System user for automated syncs
+    const userId = await resolveSystemUserId() // Valid admin/manager user for audit logging
 
     // Fetch vendors from QBO
     const lastSync = await getLastSyncTimestamp("vendors")
@@ -403,7 +428,7 @@ export async function importQboInvoices() {
       }
     }
 
-    const userId = 'system' // System user for automated syncs
+    const userId = await resolveSystemUserId() // Valid admin/manager user for audit logging
 
     // Fetch open invoices from QBO
     const lastSync = await getLastSyncTimestamp("invoices")

@@ -17,6 +17,7 @@ import {
   importQboInvoices,
   getQboStatus
 } from '@/lib/qbo-sync-standalone'
+import { resolveSystemUserId } from '@/lib/qbo-sync-standalone'
 
 // Configuration from environment variables
 const SYNC_ENABLED = process.env.QBO_AUTO_SYNC_ENABLED === 'true'
@@ -153,8 +154,9 @@ async function runAutoSync() {
     results.success = results.errors.length === 0
 
     // Log completion with audit trail
+    const systemUserId = await resolveSystemUserId()
     await logActivity(
-      'system', // system user
+      systemUserId,
       AuditAction.SYNC,
       EntityType.SYSTEM,
       'QBO_AUTO_SYNC',
@@ -180,8 +182,9 @@ async function runAutoSync() {
 
     // Log error to audit trail
     try {
+      const systemUserId = await resolveSystemUserId()
       await logActivity(
-        'system',
+        systemUserId,
         AuditAction.ERROR,
         EntityType.SYSTEM,
         'QBO_AUTO_SYNC_ERROR',
