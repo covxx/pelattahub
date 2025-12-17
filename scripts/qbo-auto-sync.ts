@@ -217,9 +217,7 @@ async function main() {
   console.log(`⏰ Cron expression: ${cronExpression}`)
 
   // Schedule the sync job
-  const scheduledTask = cron.schedule(cronExpression, runAutoSync, {
-    scheduled: false, // Don't start immediately
-  })
+  const scheduledTask = cron.schedule(cronExpression, runAutoSync)
 
   // Run initial sync on startup
   console.log('🔄 Running initial sync...')
