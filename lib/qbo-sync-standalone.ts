@@ -63,7 +63,7 @@ export async function importQboCustomers() {
   try {
     // Check connection status
     const connectionStatus = await getQboStatus()
-    if (!connectionStatus.connected) {
+    if (!connectionStatus.success || !connectionStatus.connected) {
       return {
         success: false,
         error: "QuickBooks Online is not connected. Please connect first.",
@@ -170,7 +170,7 @@ export async function importQboItems() {
   try {
     // Check connection status
     const connectionStatus = await getQboStatus()
-    if (!connectionStatus.connected) {
+    if (!connectionStatus.success || !connectionStatus.connected) {
       return {
         success: false,
         error: "QuickBooks Online is not connected. Please connect first.",
@@ -300,7 +300,7 @@ export async function importQboVendors() {
   try {
     // Check connection status
     const connectionStatus = await getQboStatus()
-    if (!connectionStatus.connected) {
+    if (!connectionStatus.success || !connectionStatus.connected) {
       return {
         success: false,
         error: "QuickBooks Online is not connected. Please connect first.",
@@ -421,7 +421,7 @@ export async function importQboInvoices() {
   try {
     // Check connection status
     const connectionStatus = await getQboStatus()
-    if (!connectionStatus.connected) {
+    if (!connectionStatus.success || !connectionStatus.connected) {
       return {
         success: false,
         error: "QuickBooks Online is not connected. Please connect first.",
