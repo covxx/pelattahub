@@ -9,7 +9,7 @@
 
 import * as cron from 'node-cron'
 import { prisma } from '@/lib/prisma'
-import { logger } from '@/lib/logger'
+import { logger, AuditAction, EntityType } from '@/lib/logger'
 import {
   importQboCustomers,
   importQboItems,
@@ -155,8 +155,8 @@ async function runAutoSync() {
     // Log completion with audit trail
     await logger.logActivity(
       'system', // system user
-      'SYNC' as any,
-      'SYSTEM' as any,
+      AuditAction.SYNC,
+      EntityType.SYSTEM,
       'QBO_AUTO_SYNC',
       {
         summary: `Auto-sync completed in ${duration}ms`,
@@ -182,8 +182,8 @@ async function runAutoSync() {
     try {
       await logger.logActivity(
         'system',
-        'ERROR' as any,
-        'SYSTEM' as any,
+        AuditAction.ERROR,
+        EntityType.SYSTEM,
         'QBO_AUTO_SYNC_ERROR',
         {
           error: errorMsg,
