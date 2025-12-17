@@ -20,7 +20,7 @@ import {
  * Resolve a valid system user ID for audit logging
  * Finds an existing admin/manager user since audit logs require valid user_id
  */
-async function resolveSystemUserId(): Promise<string> {
+export async function resolveSystemUserId(): Promise<string> {
   // Try to find an admin user first
   const adminUser = await prisma.user.findFirst({
     where: { role: "ADMIN" } as any,
