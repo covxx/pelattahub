@@ -440,6 +440,8 @@ export async function importQboInvoices() {
       qboInvoices = await fetchQboByQuery(query)
     }
 
+    console.log(`Found ${qboInvoices.length} open invoices in QuickBooks`)
+
     if (qboInvoices.length === 0) {
       return {
         success: true,
@@ -450,6 +452,7 @@ export async function importQboInvoices() {
 
     let imported = 0
     const errors: string[] = []
+    console.log(`Processing ${qboInvoices.length} invoices...`)
 
     // Process each invoice
     for (const qboInvoice of qboInvoices) {
@@ -463,6 +466,7 @@ export async function importQboInvoices() {
 
         if (existingOrder) {
           // Skip if already imported
+          console.log(`Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - already imported as order ${existingOrder.id}`)
           continue
         }
 
@@ -472,6 +476,7 @@ export async function importQboInvoices() {
         })
 
         if (!customer) {
+          console.log(`Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Customer QBO ID: ${qboInvoice.CustomerRef.value}`)
           errors.push(
             `Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync customers first.`
           )
@@ -495,6 +500,7 @@ export async function importQboInvoices() {
             })
 
             if (!product) {
+              console.log(`Product not found for item ${itemDetail.ItemRef.name} in invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Product QBO ID: ${itemDetail.ItemRef.value}`)
               errors.push(
                 `Product not found for item ${itemDetail.ItemRef.name} in invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync products first.`
               )
@@ -544,8 +550,10 @@ export async function importQboInvoices() {
           } as any,
         })
 
+        console.log(`Successfully created order for invoice ${qboInvoice.DocNumber || qboInvoice.Id}`)
         imported++
       } catch (invoiceError) {
+        console.error(`Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}:`, invoiceError)
         errors.push(
           `Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}: ${
             invoiceError instanceof Error ? invoiceError.message : "Unknown error"
