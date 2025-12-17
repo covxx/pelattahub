@@ -51,6 +51,7 @@ export async function getQboStatus() {
   } catch (error) {
     return {
       success: false,
+      connected: false,
       error: error instanceof Error ? error.message : "Failed to get status",
     }
   }
