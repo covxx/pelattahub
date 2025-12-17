@@ -20,7 +20,15 @@ import {
  * Check QBO connection status (standalone version)
  */
 export async function getQboStatus() {
-  return await getConnectionStatus()
+  try {
+    const status = await getConnectionStatus()
+    return { success: true, ...status }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get status",
+    }
+  }
 }
 
 /**
