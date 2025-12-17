@@ -16,7 +16,7 @@ import {
   importQboVendors,
   importQboInvoices,
   getQboStatus
-} from '@/app/actions/qbo-sync'
+} from '@/lib/qbo-sync-standalone'
 
 // Configuration from environment variables
 const SYNC_ENABLED = process.env.QBO_AUTO_SYNC_ENABLED === 'true'
@@ -214,7 +214,7 @@ async function main() {
   console.log(`⏰ Cron expression: ${cronExpression}`)
 
   // Schedule the sync job
-  cron.schedule(cronExpression, runAutoSync, {
+  const scheduledTask = cron.schedule(cronExpression, runAutoSync, {
     scheduled: false, // Don't start immediately
   })
 
@@ -223,20 +223,22 @@ async function main() {
   await runAutoSync()
 
   // Start the scheduled job
-  cron.schedule(cronExpression, runAutoSync)
+  scheduledTask.start()
 
   console.log('✅ QBO Auto-Sync Service started successfully')
 
   // Keep the process running
   process.on('SIGINT', () => {
     console.log('🛑 Shutting down QBO Auto-Sync Service...')
-    cron.getTasks().forEach(task => task.destroy())
+    scheduledTask.stop()
+    scheduledTask.destroy()
     process.exit(0)
   })
 
   process.on('SIGTERM', () => {
     console.log('🛑 Shutting down QBO Auto-Sync Service...')
-    cron.getTasks().forEach(task => task.destroy())
+    scheduledTask.stop()
+    scheduledTask.destroy()
     process.exit(0)
   })
 }

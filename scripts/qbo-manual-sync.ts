@@ -14,7 +14,7 @@ import {
   importQboVendors,
   importQboInvoices,
   getQboStatus
-} from '@/app/actions/qbo-sync'
+} from '@/lib/qbo-sync-standalone'
 
 async function main() {
   console.log('🚀 Starting QBO Manual Sync')
