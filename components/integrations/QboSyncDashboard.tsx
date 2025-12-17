@@ -5,6 +5,9 @@ import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import { 
   Link2, 
   Users, 
@@ -16,13 +19,16 @@ import {
   Building2,
   FileText
 } from "lucide-react"
-import { 
-  importQboCustomers, 
-  importQboItems, 
+import {
+  importQboCustomers,
+  importQboItems,
   importQboVendors,
   importQboInvoices,
   getQboStatus,
-  getQboAuthUrl
+  getQboAuthUrl,
+  getQboAutoSyncSettings,
+  updateQboAutoSyncSettings,
+  runManualFullSync
 } from "@/app/actions/qbo-sync"
 import { useToast } from "@/hooks/useToast"
 import { ToastContainer } from "@/components/ui/toast"
@@ -48,6 +54,23 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
     result: any
     timestamp: Date
   } | null>(null)
+  const [autoSyncSettings, setAutoSyncSettings] = useState<{
+    enabled: boolean
+    intervalMinutes: number
+    syncCustomers: boolean
+    syncProducts: boolean
+    syncVendors: boolean
+    syncInvoices: boolean
+  }>({
+    enabled: false,
+    intervalMinutes: 1,
+    syncCustomers: true,
+    syncProducts: true,
+    syncVendors: true,
+    syncInvoices: true,
+  })
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+  const [isRunningFullSync, setIsRunningFullSync] = useState(false)
   const { toast, toasts, removeToast } = useToast()
 
   // Fetch connection status on mount and when query params change
@@ -75,7 +98,7 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
   useEffect(() => {
     const success = searchParams.get("success")
     const error = searchParams.get("error")
-    
+
     if (success === "true") {
       toast("Successfully connected to QuickBooks Online!", "success")
       // Refetch status to show updated connection
@@ -90,6 +113,12 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
           })
         }
       })
+      // Fetch auto-sync settings after connection
+      getQboAutoSyncSettings().then((result) => {
+        if (result.success) {
+          setAutoSyncSettings(result.settings)
+        }
+      })
       // Clean up URL
       window.history.replaceState({}, "", "/dashboard/admin/integrations/qbo")
     } else if (error) {
@@ -98,6 +127,21 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
       window.history.replaceState({}, "", "/dashboard/admin/integrations/qbo")
     }
   }, [searchParams, toast])
+
+  // Fetch auto-sync settings on mount
+  useEffect(() => {
+    const fetchAutoSyncSettings = async () => {
+      try {
+        const result = await getQboAutoSyncSettings()
+        if (result.success) {
+          setAutoSyncSettings(result.settings)
+        }
+      } catch (error) {
+        console.error("Error fetching auto-sync settings:", error)
+      }
+    }
+    fetchAutoSyncSettings()
+  }, [])
 
   const handleConnect = async () => {
     try {
@@ -225,6 +269,54 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
     })
   }
 
+  const handleUpdateAutoSyncSettings = async () => {
+    setIsUpdatingSettings(true)
+    try {
+      const result = await updateQboAutoSyncSettings(autoSyncSettings)
+      if (result.success) {
+        toast("Auto-sync settings updated successfully", "success")
+      } else {
+        toast(result.error || "Failed to update settings", "error")
+      }
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : "Failed to update settings",
+        "error"
+      )
+    } finally {
+      setIsUpdatingSettings(false)
+    }
+  }
+
+  const handleRunFullSync = async () => {
+    setIsRunningFullSync(true)
+    try {
+      const result = await runManualFullSync()
+      if (result.success) {
+        toast("Full sync completed successfully", "success")
+        if (result.errors && result.errors.length > 0) {
+          toast(
+            `${result.errors.length} errors occurred. Check console for details.`,
+            "info"
+          )
+          console.error("Full sync errors:", result.errors)
+        }
+      } else {
+        toast(result.error || "Full sync failed", "error")
+        if (result.errors) {
+          console.error("Full sync errors:", result.errors)
+        }
+      }
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : "An error occurred during full sync",
+        "error"
+      )
+    } finally {
+      setIsRunningFullSync(false)
+    }
+  }
+
   return (
     <>
       <div className="grid gap-6 md:grid-cols-2">
@@ -283,6 +375,140 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
               <Link2 className="h-4 w-4 mr-2" />
               {connectionStatus.connected ? "Reconnect to QuickBooks" : "Connect to QuickBooks"}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Auto-Sync Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Auto-Sync Settings</CardTitle>
+            <CardDescription>
+              Configure automatic synchronization with QuickBooks Online
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="auto-sync-enabled">Enable Auto-Sync</Label>
+              <Switch
+                id="auto-sync-enabled"
+                checked={autoSyncSettings.enabled}
+                onCheckedChange={(enabled) =>
+                  setAutoSyncSettings(prev => ({ ...prev, enabled }))
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="sync-interval">Sync Interval</Label>
+                <Select
+                  value={autoSyncSettings.intervalMinutes.toString()}
+                  onValueChange={(value) =>
+                    setAutoSyncSettings(prev => ({
+                      ...prev,
+                      intervalMinutes: parseInt(value)
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Every minute</SelectItem>
+                    <SelectItem value="5">Every 5 minutes</SelectItem>
+                    <SelectItem value="10">Every 10 minutes</SelectItem>
+                    <SelectItem value="15">Every 15 minutes</SelectItem>
+                    <SelectItem value="30">Every 30 minutes</SelectItem>
+                    <SelectItem value="60">Every hour</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Entities to Sync</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="sync-customers"
+                    checked={autoSyncSettings.syncCustomers}
+                    onCheckedChange={(syncCustomers) =>
+                      setAutoSyncSettings(prev => ({ ...prev, syncCustomers }))
+                    }
+                  />
+                  <Label htmlFor="sync-customers">Customers</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="sync-products"
+                    checked={autoSyncSettings.syncProducts}
+                    onCheckedChange={(syncProducts) =>
+                      setAutoSyncSettings(prev => ({ ...prev, syncProducts }))
+                    }
+                  />
+                  <Label htmlFor="sync-products">Products</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="sync-vendors"
+                    checked={autoSyncSettings.syncVendors}
+                    onCheckedChange={(syncVendors) =>
+                      setAutoSyncSettings(prev => ({ ...prev, syncVendors }))
+                    }
+                  />
+                  <Label htmlFor="sync-vendors">Vendors</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="sync-invoices"
+                    checked={autoSyncSettings.syncInvoices}
+                    onCheckedChange={(syncInvoices) =>
+                      setAutoSyncSettings(prev => ({ ...prev, syncInvoices }))
+                    }
+                  />
+                  <Label htmlFor="sync-invoices">Sales Orders</Label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleUpdateAutoSyncSettings}
+                disabled={isUpdatingSettings}
+                className="flex-1"
+              >
+                {isUpdatingSettings ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Save Settings"
+                )}
+              </Button>
+              <Button
+                onClick={handleRunFullSync}
+                disabled={!connectionStatus.connected || isRunningFullSync}
+                variant="outline"
+                className="flex-1"
+              >
+                {isRunningFullSync ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Run Full Sync
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Auto-sync will run automatically based on your settings. Use "Run Full Sync" for immediate synchronization.
+            </p>
           </CardContent>
         </Card>
 

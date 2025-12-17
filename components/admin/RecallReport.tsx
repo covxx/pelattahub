@@ -466,3 +466,4 @@ function LotSection({
     </Card>
   )
 }
+

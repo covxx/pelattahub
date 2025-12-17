@@ -76,3 +76,4 @@ export async function submitContact(prevState: ContactFormState, formData: FormD
     return { success: false, error: "Unable to send your message right now. Please try again later." }
   }
 }
+

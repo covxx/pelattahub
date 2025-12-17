@@ -699,4 +699,195 @@ export async function getQboAuthUrl() {
   }
 }
 
+/**
+ * Get QBO auto-sync settings
+ */
+export async function getQboAutoSyncSettings() {
+  await requireAdminOrManager()
+
+  try {
+    const settings = await prisma.integrationSettings.findUnique({
+      where: { provider: "qbo" },
+    })
+
+    const metadata = (settings as any)?.metadata || {}
+    const autoSyncSettings = metadata.autoSync || {
+      enabled: false,
+      intervalMinutes: 1,
+      syncCustomers: true,
+      syncProducts: true,
+      syncVendors: true,
+      syncInvoices: true,
+    }
+
+    return {
+      success: true,
+      settings: autoSyncSettings,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get auto-sync settings",
+    }
+  }
+}
+
+/**
+ * Update QBO auto-sync settings
+ */
+export async function updateQboAutoSyncSettings(settings: {
+  enabled: boolean
+  intervalMinutes: number
+  syncCustomers: boolean
+  syncProducts: boolean
+  syncVendors: boolean
+  syncInvoices: boolean
+}) {
+  const session = await requireAdminOrManager()
+
+  try {
+    const existing = await prisma.integrationSettings.findUnique({
+      where: { provider: "qbo" },
+    })
+
+    const existingMetadata = ((existing as any)?.metadata || {}) as Record<string, any>
+    const newMetadata = {
+      ...existingMetadata,
+      autoSync: settings,
+      autoSyncEnabled: settings.enabled, // Also store at top level for easier access
+    }
+
+    await prisma.integrationSettings.update({
+      where: { provider: "qbo" },
+      data: {
+        metadata: newMetadata,
+      } as any,
+    })
+
+    // Log activity
+    await logActivity(
+      session.user.id,
+      AuditAction.UPDATE,
+      EntityType.SYSTEM,
+      "QBO_AUTO_SYNC_SETTINGS",
+      {
+        summary: `Updated QBO auto-sync settings`,
+        settings,
+      }
+    )
+
+    revalidatePath("/dashboard/admin/integrations/qbo")
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update auto-sync settings",
+    }
+  }
+}
+
+/**
+ * Run a manual full sync (same as auto-sync but triggered manually)
+ */
+export async function runManualFullSync() {
+  const session = await requireAdminOrManager()
+
+  try {
+    // Check connection status
+    const connectionStatus = await getQboConnectionStatus()
+    if (!connectionStatus.connected) {
+      return {
+        success: false,
+        error: "QuickBooks Online is not connected. Please connect first.",
+      }
+    }
+
+    logger.info(`Manual full sync started by user ${session.user.id}`)
+
+    const results = {
+      customers: null as any,
+      products: null as any,
+      vendors: null as any,
+      invoices: null as any,
+      success: true,
+      errors: [] as string[]
+    }
+
+    // Sync customers
+    try {
+      const customerResult = await importQboCustomers()
+      results.customers = customerResult
+      if (!customerResult.success) {
+        results.errors.push(`Customers: ${customerResult.error}`)
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      results.errors.push(`Customers: ${errorMsg}`)
+    }
+
+    // Sync products
+    try {
+      const productResult = await importQboItems()
+      results.products = productResult
+      if (!productResult.success) {
+        results.errors.push(`Products: ${productResult.error}`)
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      results.errors.push(`Products: ${errorMsg}`)
+    }
+
+    // Sync vendors
+    try {
+      const vendorResult = await importQboVendors()
+      results.vendors = vendorResult
+      if (!vendorResult.success) {
+        results.errors.push(`Vendors: ${vendorResult.error}`)
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      results.errors.push(`Vendors: ${errorMsg}`)
+    }
+
+    // Sync invoices
+    try {
+      const invoiceResult = await importQboInvoices()
+      results.invoices = invoiceResult
+      if (!invoiceResult.success) {
+        results.errors.push(`Invoices: ${invoiceResult.error}`)
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      results.errors.push(`Invoices: ${errorMsg}`)
+    }
+
+    results.success = results.errors.length === 0
+
+    // Log activity
+    await logActivity(
+      session.user.id,
+      AuditAction.SYNC,
+      EntityType.SYSTEM,
+      "QBO_MANUAL_FULL_SYNC",
+      {
+        summary: `Manual full sync completed with ${results.errors.length} errors`,
+        results,
+      }
+    )
+
+    revalidatePath("/dashboard/admin/integrations/qbo")
+    return {
+      success: results.success,
+      results,
+      errors: results.errors.length > 0 ? results.errors : undefined,
+    }
+  } catch (error) {
+    console.error("Error in manual full sync:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to run manual sync",
+    }
+  }
+}
+
 
