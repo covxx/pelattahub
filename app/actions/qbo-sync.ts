@@ -804,9 +804,23 @@ export async function updateQboAutoSyncSettings(settings: {
       autoSyncEnabled: settings.enabled, // Also store at top level for easier access
     }
 
-    await prisma.integrationSettings.update({
+    // Use upsert to create the record if it doesn't exist (e.g., settings saved before connecting)
+    // This allows users to configure auto-sync settings even before connecting to QBO
+    await prisma.integrationSettings.upsert({
       where: { provider: "qbo" },
-      data: {
+      update: {
+        metadata: newMetadata,
+      } as any,
+      create: {
+        provider: "qbo",
+        // If record doesn't exist, create with minimal required fields
+        // access_token is required but will be set when user connects to QBO
+        access_token: "",
+        refresh_token: null,
+        token_expires_at: null,
+        refresh_token_expires_at: null,
+        realm_id: null,
+        is_connected: false,
         metadata: newMetadata,
       } as any,
     })

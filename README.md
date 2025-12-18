@@ -1,25 +1,71 @@
 # Warehouse Management System (WMS) for Fresh Produce
 
-A modern, web-based Warehouse Management System specifically designed for fresh produce inventory tracking with lot-based management, FIFO (First In, First Out) support, and role-based access control.
+A modern, web-based Warehouse Management System specifically designed for fresh produce inventory tracking with lot-based management, FIFO (First In, First Out) support, PTI (Produce Traceability Initiative) compliance, and seamless QuickBooks Online integration.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router), React, TypeScript, Tailwind CSS
-- **UI Components**: Shadcn UI
-- **Icons**: Lucide React
-- **Backend**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js v5
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript 5+ (Strict Mode)
+- **Database**: PostgreSQL 15+ via Prisma ORM
+- **UI**: Tailwind CSS 4 + Shadcn UI (Radix Primitives)
+- **Authentication**: NextAuth.js v5 (Beta)
+- **Printing**: Raw ZPL (Browser-Native) & PDF (React-PDF)
+- **Infrastructure**: Docker & Docker Compose (Production ready)
+- **Integration**: QuickBooks Online API (OAuth 2.0)
 
 ## Features
 
 ### Core Business Logic
 
-- **Lot-Based Inventory**: All inventory is tracked by lots (e.g., "Apples - Lot #123 - Received 11/25")
+- **Lot-Based Inventory**: All inventory is tracked by specific lots with full traceability
 - **FIFO Support**: Automatic sorting by oldest lots first for expiry management
+- **PTI Compliance**: PTI-compliant label generation with barcode and voice pick codes (CRC16)
+- **Multi-Unit Support**: Handles both CASE and LBS (Pounds) with automatic conversion
 - **Role-Based Access Control**:
-  - **Admin**: Full access (CRUD Items, Users, Settings)
-  - **Receiver**: Can only access "Inbound" screen to create new Lots
-  - **Packer**: Can only access "Labeling" screen to print labels
+  - **Admin**: Full system access (Users, Products, Customers, Orders, Settings, Integrations)
+  - **Manager**: Most admin features except system logs
+  - **Receiver**: Receiving operations and lot creation
+  - **Packer**: Picking operations and order fulfillment
+
+### Order Management
+
+- **Sales Order Creation**: Create orders from QuickBooks invoices or manually
+- **FIFO Allocation**: Intelligent lot allocation based on expiry dates
+- **Picking Interface**: Warehouse-friendly picking workflow with lot validation
+- **Order Status Tracking**: Draft → Confirmed → Allocated → Picking → Shipped
+- **Order History**: Complete audit trail of all order operations
+
+### QuickBooks Online Integration
+
+- **OAuth 2.0 Authentication**: Secure connection to QuickBooks Online
+- **Automated Background Sync**: Continuous synchronization service (configurable intervals)
+- **Two-Way Data Sync**:
+  - Customers: QBO → WMS
+  - Products/Items: QBO → WMS
+  - Vendors: QBO → WMS
+  - Invoices: QBO → WMS (creates sales orders)
+- **Auto-Sync Service**: Background Docker service for continuous synchronization
+- **Sync Dashboard**: Admin interface for monitoring and manual sync operations
+
+### Receiving & Inventory
+
+- **Receiving Events**: Batch receiving with multiple products and lots
+- **Lot Number Generation**: Automatic lot number generation with configurable format
+- **Inventory Adjustments**: Manual quantity adjustments with audit logging
+- **Lot History**: Complete traceability of lot movements and status changes
+- **Expiry Tracking**: Automatic expiry date management and alerts
+
+### Production Module
+
+- **Production Orders**: Create and manage production batches
+- **Lot Tracking**: Track raw materials and finished goods through production
+- **Yield Management**: Record production yields and waste
+
+### Reporting & Traceability
+
+- **Recall Reports**: Generate comprehensive recall reports with full lot traceability
+- **Audit Logs**: Complete audit trail of all system operations
+- **Traceability Explorer**: Search and trace products, lots, and orders across the system
 
 ## Getting Started
 
@@ -137,26 +183,44 @@ wms/
     └── next-auth.d.ts   # NextAuth type extensions
 ```
 
+## Current Release
+
+**v1.1 "Orion"** (December 18, 2025)
+- QuickBooks Online Auto-Sync Service
+- Enhanced Invoice Sync Processing
+- Improved deployment and configuration management
+
+See [RELEASE_v1.1.md](./RELEASE_v1.1.md) for full release notes.
+
 ## Project Roadmap
 
 See [ROADMAP.md](./ROADMAP.md) for detailed information about upcoming features:
 
-- 🏷️ **Print UX Polish** - Streamlined printing workflow
-- 🚚 **Outbound Order Management** - Complete order-to-shipment workflow with FIFO allocation
-- 📄 **Document Generation** - PDF receipts, BOL, and packing slips
-- 💰 **QuickBooks Online Integration** - Two-way sync for customers, products, and invoices
+- 📱 **Mobile Version** - Native mobile experience for warehouse operations
+- 🌙 **Dark Mode** - System-wide dark theme support
+- 🛡️ **Food Safety Features** - Enhanced food safety compliance and tracking
 
-## Next Steps
+## System Status
 
-1. ✅ Create seed data for initial users and products
-2. ✅ Build the authentication pages (login, signup)
-3. ✅ Implement role-based route protection
-4. ✅ Create the Inbound screen for Receivers
-5. ✅ Create the Labeling screen for Packers
-6. ✅ Build the Admin dashboard
-7. ✅ Implement lot creation and management
-8. ✅ Add FIFO sorting and expiry tracking
-9. 🔄 See ROADMAP.md for upcoming features
+### ✅ Implemented Features
+
+- ✅ Lot-based inventory tracking with full traceability
+- ✅ Receiving operations with batch processing
+- ✅ PTI-compliant label generation (ZPL)
+- ✅ Order management with FIFO allocation
+- ✅ Picking interface with lot validation
+- ✅ Production module for batch processing
+- ✅ QuickBooks Online integration with auto-sync
+- ✅ Customer, product, and vendor management
+- ✅ Recall reporting and traceability explorer
+- ✅ Comprehensive audit logging
+- ✅ Role-based access control (Admin, Manager, Receiver, Packer)
+- ✅ System settings and configuration
+- ✅ Docker-based deployment
+
+### 🔄 Upcoming Features
+
+See [ROADMAP.md](./ROADMAP.md) for planned features.
 
 ## Development
 
@@ -219,11 +283,18 @@ This application is containerized and ready for deployment on a Linux VPS using 
    POSTGRES_PORT=5432
 
    # Application
-   DATABASE_URL=postgresql://wms:your_secure_password_here@postgres:5432/wms?schema=public
+   DATABASE_URL=postgresql://wms:your_secure_password_here@db:5432/wms?schema=public
    NEXTAUTH_SECRET=your_secret_key_here_generate_with_openssl_rand_base64_32
    NEXTAUTH_URL=https://your-domain.com
    NODE_ENV=production
-   APP_PORT=3000
+   
+   # QuickBooks Online Integration (optional)
+   QBO_CLIENT_ID=your_qbo_client_id
+   QBO_CLIENT_SECRET=your_qbo_client_secret
+   QBO_REDIRECT_URI=https://your-domain.com/api/auth/qbo/callback
+   QBO_ENVIRONMENT=production
+   QBO_AUTO_SYNC_ENABLED=false
+   QBO_SYNC_INTERVAL_MINUTES=1
    ```
 
 4. **Generate NEXTAUTH_SECRET**:
@@ -279,16 +350,18 @@ The script will:
 
 ### Docker Compose Services
 
-- **postgres**: PostgreSQL 15 database with persistent volume
+- **db**: PostgreSQL 15 database with persistent volume (`./pgdata`)
 - **prisma-migrate**: Runs database migrations on startup (one-time)
 - **app**: Next.js application (port 3000)
+- **qbo-sync**: QuickBooks Online auto-sync service (background worker)
 
 ### Useful Commands
 
 ```bash
 # View logs
 docker compose logs -f app
-docker compose logs -f postgres
+docker compose logs -f db
+docker compose logs -f qbo-sync  # If auto-sync is enabled
 
 # Stop all services
 docker compose down
@@ -300,13 +373,17 @@ docker compose down -v
 docker compose up -d --build
 
 # Access database
-docker compose exec postgres psql -U wms -d wms
+docker compose exec db psql -U wms -d wms
 
 # Run Prisma Studio (for database management)
 docker compose exec app npx prisma studio
 
 # View container resource usage
 docker stats
+
+# Check QBO auto-sync service status
+docker compose ps qbo-sync
+docker compose logs -f qbo-sync
 ```
 
 ### Production Considerations
@@ -377,7 +454,21 @@ docker compose exec app env | grep DATABASE_URL
 **Database connection issues:**
 ```bash
 # Test database connection
-docker compose exec postgres psql -U wms -d wms -c "SELECT 1;"
+docker compose exec db psql -U wms -d wms -c "SELECT 1;"
+```
+
+**QBO auto-sync not working:**
+```bash
+# Check if service is running
+docker compose ps qbo-sync
+
+# View sync logs
+docker compose logs -f qbo-sync
+
+# Restart sync service
+docker compose restart qbo-sync
+
+# Verify QBO connection in admin dashboard
 ```
 
 ## License

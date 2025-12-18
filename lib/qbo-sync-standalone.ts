@@ -433,14 +433,19 @@ export async function importQboInvoices() {
 
     // Fetch open invoices from QBO
     const lastSync = await getLastSyncTimestamp("invoices")
+    console.log(`[QBO Invoice Sync] Last sync timestamp: ${lastSync ? lastSync.toISOString() : 'never'}`)
+
     let query = buildSyncQuery("invoices", lastSync)
+    console.log(`[QBO Invoice Sync] Executing query: ${query}`)
     let qboInvoices = await fetchQboByQuery(query)
+    console.log(`[QBO Invoice Sync] Found ${qboInvoices.length} invoices with lastSync filter`)
+
     if (qboInvoices.length === 0 && lastSync) {
       query = buildSyncQuery("invoices", null)
+      console.log(`[QBO Invoice Sync] Retrying with full query: ${query}`)
       qboInvoices = await fetchQboByQuery(query)
+      console.log(`[QBO Invoice Sync] Found ${qboInvoices.length} invoices with full query`)
     }
-
-    console.log(`Found ${qboInvoices.length} open invoices in QuickBooks`)
 
     if (qboInvoices.length === 0) {
       return {
@@ -452,7 +457,12 @@ export async function importQboInvoices() {
 
     let imported = 0
     const errors: string[] = []
-    console.log(`Processing ${qboInvoices.length} invoices...`)
+    const skipped: string[] = []
+    const skippedDetails: Array<{invoiceId: string, docNumber?: string, reason: string}> = []
+    const invoiceIdsFound = qboInvoices.map(inv => inv.Id)
+
+    console.log(`[QBO Invoice Sync] Processing ${qboInvoices.length} invoices...`)
+    console.log(`[QBO Invoice Sync] Invoice IDs found: ${JSON.stringify(invoiceIdsFound)}`)
 
     // Process each invoice
     for (const qboInvoice of qboInvoices) {
@@ -466,9 +476,18 @@ export async function importQboInvoices() {
 
         if (existingOrder) {
           // Skip if already imported
-          console.log(`Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - already imported as order ${existingOrder.id}`)
+          const skipReason = `Already imported as order ${existingOrder.id}`
+          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - ${skipReason}`)
+          skipped.push(qboInvoice.Id)
+          skippedDetails.push({
+            invoiceId: qboInvoice.Id,
+            docNumber: qboInvoice.DocNumber,
+            reason: skipReason
+          })
           continue
         }
+
+        console.log(`[QBO Invoice Sync] Processing invoice ${qboInvoice.DocNumber || qboInvoice.Id}`)
 
         // Find customer by qbo_id
         const customer = await prisma.customer.findFirst({
@@ -476,10 +495,14 @@ export async function importQboInvoices() {
         })
 
         if (!customer) {
-          console.log(`Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Customer QBO ID: ${qboInvoice.CustomerRef.value}`)
-          errors.push(
-            `Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync customers first.`
-          )
+          const skipReason = `Customer not found (QBO ID: ${qboInvoice.CustomerRef.value}). Please sync customers first.`
+          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - ${skipReason}`)
+          skipped.push(qboInvoice.Id)
+          skippedDetails.push({
+            invoiceId: qboInvoice.Id,
+            docNumber: qboInvoice.DocNumber,
+            reason: skipReason
+          })
           continue
         }
 
@@ -500,7 +523,7 @@ export async function importQboInvoices() {
             })
 
             if (!product) {
-              console.log(`Product not found for item ${itemDetail.ItemRef.name} in invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Product QBO ID: ${itemDetail.ItemRef.value}`)
+              console.log(`[QBO Invoice Sync] Product not found for item ${itemDetail.ItemRef.name} in invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Product QBO ID: ${itemDetail.ItemRef.value}`)
               errors.push(
                 `Product not found for item ${itemDetail.ItemRef.name} in invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync products first.`
               )
@@ -516,9 +539,14 @@ export async function importQboInvoices() {
         }
 
         if (orderItems.length === 0) {
-          errors.push(
-            `No valid items found in invoice ${qboInvoice.DocNumber || qboInvoice.Id}`
-          )
+          const skipReason = `No valid items found in invoice`
+          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - ${skipReason}`)
+          skipped.push(qboInvoice.Id)
+          skippedDetails.push({
+            invoiceId: qboInvoice.Id,
+            docNumber: qboInvoice.DocNumber,
+            reason: skipReason
+          })
           continue
         }
 
@@ -550,10 +578,10 @@ export async function importQboInvoices() {
           } as any,
         })
 
-        console.log(`Successfully created order for invoice ${qboInvoice.DocNumber || qboInvoice.Id}`)
+        console.log(`[QBO Invoice Sync] Successfully imported invoice ${qboInvoice.DocNumber || qboInvoice.Id}`)
         imported++
       } catch (invoiceError) {
-        console.error(`Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}:`, invoiceError)
+        console.error(`[QBO Invoice Sync] Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}:`, invoiceError)
         errors.push(
           `Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}: ${
             invoiceError instanceof Error ? invoiceError.message : "Unknown error"
@@ -577,10 +605,21 @@ export async function importQboInvoices() {
     )
 
     await setLastSyncTimestamp("invoices", new Date())
+
+    console.log(`[QBO Invoice Sync] Completed: ${imported} imported, ${skipped.length} skipped, ${errors.length} errors, ${qboInvoices.length} total processed`)
+    console.log(`[QBO Invoice Sync] Invoice IDs found: ${JSON.stringify(invoiceIdsFound)}`)
+    console.log(`[QBO Invoice Sync] Skipped invoice IDs: ${JSON.stringify(skipped)}`)
+    if (skippedDetails.length > 0) {
+      console.log(`[QBO Invoice Sync] Skip details:`, skippedDetails)
+    }
+
     return {
       success: true,
       imported,
+      skipped: skipped.length,
       total: qboInvoices.length,
+      invoiceIdsFound,
+      skippedDetails: skippedDetails.length > 0 ? skippedDetails : undefined,
       errors: errors.length > 0 ? errors : undefined,
     }
   } catch (error) {
