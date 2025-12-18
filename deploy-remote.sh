@@ -51,55 +51,48 @@ cleanup_logs() {
 trap cleanup_logs EXIT
 
 echo "🔨 Building Docker image locally (amd64 platform)..."
-echo "   Build output will be displayed below. Warnings and errors will be highlighted."
 echo ""
 
-# Build with output captured and displayed in real-time
-# Use tee to both display and save output
+# Build with output captured to log file, but display Docker's clean output normally
+# Docker's buildkit output is nicely formatted - tee writes to both stdout (terminal) and log file
 if docker build --platform linux/amd64 --no-cache -t wms-app . 2>&1 | tee "$BUILD_LOG"; then
   echo ""
   echo "✅ Build complete!"
   
-  # Check for warnings and errors in the build output
+  # Analyze the captured log for warnings and errors (without cluttering the nice output)
   WARNINGS=$(grep -i "warning" "$BUILD_LOG" | wc -l || echo "0")
   ERRORS=$(grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | wc -l || echo "0")
   
   if [ "$WARNINGS" -gt 0 ] || [ "$ERRORS" -gt 0 ]; then
     echo ""
-    echo "⚠️  Build completed with issues:"
+    echo "⚠️  Build completed with issues detected:"
     if [ "$WARNINGS" -gt 0 ]; then
       echo "   ⚠️  Warnings: $WARNINGS"
-      echo "   Showing warnings:"
-      grep -i "warning" "$BUILD_LOG" | head -10 | sed 's/^/      /'
-      if [ "$WARNINGS" -gt 10 ]; then
-        echo "      ... and $((WARNINGS - 10)) more warnings (see build log for details)"
+      # Show unique warnings (avoid duplicates from step numbers like #12)
+      grep -i "warning" "$BUILD_LOG" | grep -v "^#" | sed 's/^[0-9#]*[[:space:]]*//' | sort -u | head -5 | sed 's/^/      /'
+      if [ "$WARNINGS" -gt 5 ]; then
+        echo "      ... and $((WARNINGS - 5)) more warnings"
       fi
     fi
     if [ "$ERRORS" -gt 0 ]; then
       echo "   ❌ Errors: $ERRORS"
-      echo "   Showing errors:"
-      grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | head -10 | sed 's/^/      /'
-      if [ "$ERRORS" -gt 10 ]; then
-        echo "      ... and $((ERRORS - 10)) more errors (see build log for details)"
+      # Show unique errors (avoid duplicates from step numbers like #12)
+      grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | grep -v "^#" | sed 's/^[0-9#]*[[:space:]]*//' | sort -u | head -5 | sed 's/^/      /'
+      if [ "$ERRORS" -gt 5 ]; then
+        echo "      ... and $((ERRORS - 5)) more errors"
       fi
     fi
-    echo ""
-    echo "   📄 Full build log saved to: $BUILD_LOG"
-    echo "   💡 Review the log above for details on warnings/errors"
+    echo "   📄 Full build log: $BUILD_LOG"
   fi
 else
   BUILD_EXIT_CODE=$?
   echo ""
   echo "❌ Build failed with exit code: $BUILD_EXIT_CODE"
   echo ""
-  echo "📄 Build log saved to: $BUILD_LOG"
+  echo "🔍 Errors found in build:"
+  grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | grep -v "^#" | tail -10 | sed 's/^/   /'
   echo ""
-  echo "🔍 Last 20 lines of build output:"
-  tail -20 "$BUILD_LOG" | sed 's/^/   /'
-  echo ""
-  echo "❌ Errors found in build:"
-  grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | tail -10 | sed 's/^/   /'
-  echo ""
+  echo "📄 Full build log: $BUILD_LOG"
   exit $BUILD_EXIT_CODE
 fi
 
