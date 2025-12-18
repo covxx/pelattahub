@@ -514,6 +514,11 @@ export async function importQboInvoices() {
       return {
         success: true,
         imported: 0,
+        total: 0,
+        skipped: 0,
+        skippedDetails: undefined,
+        invoiceIdsFound: [],
+        errors: undefined,
         message: "No open invoices found in QuickBooks Online",
       }
     }
