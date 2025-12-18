@@ -12,3 +12,16 @@ services:
     # Add production-specific configurations here
     # e.g., resource limits, logging, etc.
 
+  # QuickBooks Auto-Sync Service (Production)
+  qbo-sync:
+    environment:
+      # Enable auto-sync in production
+      QBO_AUTO_SYNC_ENABLED: "true"
+      # Run sync every 1 minute
+      QBO_SYNC_INTERVAL_MINUTES: "1"
+      # Enable all sync types
+      QBO_SYNC_CUSTOMERS: "true"
+      QBO_SYNC_PRODUCTS: "true"
+      QBO_SYNC_VENDORS: "true"
+      QBO_SYNC_INVOICES: "true"
+

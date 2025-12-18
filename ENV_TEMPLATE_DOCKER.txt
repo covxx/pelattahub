@@ -23,6 +23,23 @@ NEXT_PUBLIC_COMPANY_ADDRESS="1234 Produce Lane, Salinas, CA"
 # Application Configuration
 NODE_ENV="production"
 
+# QuickBooks Online Integration
+QBO_CLIENT_ID="your_qbo_client_id"
+QBO_CLIENT_SECRET="your_qbo_client_secret"
+QBO_REDIRECT_URI="http://localhost:3000/api/auth/qbo/callback"
+QBO_ENVIRONMENT="sandbox"  # or "production"
+
+# QuickBooks Auto-Sync Configuration
+# Set to "true" to enable background auto-sync service
+QBO_AUTO_SYNC_ENABLED="false"
+# Sync interval in minutes (1, 5, 10, 15, 30, or 60)
+QBO_SYNC_INTERVAL_MINUTES="1"
+# Enable/disable specific sync types
+QBO_SYNC_CUSTOMERS="true"
+QBO_SYNC_PRODUCTS="true"
+QBO_SYNC_VENDORS="true"
+QBO_SYNC_INVOICES="true"
+
 # Email (Google Workspace SMTP)
 # Use an App Password for EMAIL_PASSWORD (2FA required)
 SALES_EMAIL="sales@srjlabs.com"
