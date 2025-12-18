@@ -39,62 +39,15 @@ fi
 # =============================================================================
 # BUILD LOCALLY
 # =============================================================================
-# Initialize log files
-BUILD_LOG=$(mktemp)
-TRANSFER_LOG=$(mktemp)
-COMPOSE_LOG=$(mktemp)
-
-# Cleanup function for all log files
-cleanup_logs() {
-  rm -f "$BUILD_LOG" "$TRANSFER_LOG" "$COMPOSE_LOG" 2>/dev/null
-}
-trap cleanup_logs EXIT
-
 echo "🔨 Building Docker image locally (amd64 platform)..."
-echo ""
+docker build --platform linux/amd64 --no-cache -t wms-app .
 
-# Build with output captured to log file, but display Docker's clean output normally
-# Docker's buildkit output is nicely formatted - tee writes to both stdout (terminal) and log file
-if docker build --platform linux/amd64 --no-cache -t wms-app . 2>&1 | tee "$BUILD_LOG"; then
-  echo ""
-  echo "✅ Build complete!"
-  
-  # Analyze the captured log for warnings and errors (without cluttering the nice output)
-  WARNINGS=$(grep -i "warning" "$BUILD_LOG" | wc -l || echo "0")
-  ERRORS=$(grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | wc -l || echo "0")
-  
-  if [ "$WARNINGS" -gt 0 ] || [ "$ERRORS" -gt 0 ]; then
-    echo ""
-    echo "⚠️  Build completed with issues detected:"
-    if [ "$WARNINGS" -gt 0 ]; then
-      echo "   ⚠️  Warnings: $WARNINGS"
-      # Show unique warnings (avoid duplicates from step numbers like #12)
-      grep -i "warning" "$BUILD_LOG" | grep -v "^#" | sed 's/^[0-9#]*[[:space:]]*//' | sort -u | head -5 | sed 's/^/      /'
-      if [ "$WARNINGS" -gt 5 ]; then
-        echo "      ... and $((WARNINGS - 5)) more warnings"
-      fi
-    fi
-    if [ "$ERRORS" -gt 0 ]; then
-      echo "   ❌ Errors: $ERRORS"
-      # Show unique errors (avoid duplicates from step numbers like #12)
-      grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | grep -v "^#" | sed 's/^[0-9#]*[[:space:]]*//' | sort -u | head -5 | sed 's/^/      /'
-      if [ "$ERRORS" -gt 5 ]; then
-        echo "      ... and $((ERRORS - 5)) more errors"
-      fi
-    fi
-    echo "   📄 Full build log: $BUILD_LOG"
-  fi
-else
-  BUILD_EXIT_CODE=$?
-  echo ""
-  echo "❌ Build failed with exit code: $BUILD_EXIT_CODE"
-  echo ""
-  echo "🔍 Errors found in build:"
-  grep -i "error" "$BUILD_LOG" | grep -v "ERRORLEVEL" | grep -v "^#" | tail -10 | sed 's/^/   /'
-  echo ""
-  echo "📄 Full build log: $BUILD_LOG"
-  exit $BUILD_EXIT_CODE
+if [ $? -ne 0 ]; then
+  echo "❌ Build failed!"
+  exit 1
 fi
+
+echo "✅ Build complete!"
 
 # =============================================================================
 # SHIP ARTIFACT TO REMOTE SERVER
@@ -102,43 +55,11 @@ fi
 echo "📦 Shipping Docker image to remote server..."
 echo "   This may take a few minutes depending on image size and connection speed..."
 
-# Get image size for progress indication
-IMAGE_SIZE=$(docker image inspect wms-app --format='{{.Size}}' 2>/dev/null || echo "0")
-if [ "$IMAGE_SIZE" != "0" ]; then
-  IMAGE_SIZE_MB=$((IMAGE_SIZE / 1024 / 1024))
-  echo "   Image size: ~${IMAGE_SIZE_MB} MB"
-fi
+docker save wms-app | bzip2 | ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && bunzip2 | docker load"
 
-# Capture transfer output (TRANSFER_LOG already initialized above)
-
-# Transfer image: save -> compress -> transfer -> decompress -> load
-# Capture docker errors/warnings, bzip2 progress may be noisy but we'll filter it
-if docker save wms-app 2>&1 | bzip2 | ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && bunzip2 | docker load 2>&1" 2>&1 | tee "$TRANSFER_LOG"; then
-  TRANSFER_EXIT_CODE=0
-else
-  TRANSFER_EXIT_CODE=$?
-fi
-
-if [ $TRANSFER_EXIT_CODE -ne 0 ]; then
-  echo ""
+if [ $? -ne 0 ]; then
   echo "❌ Failed to transfer image to remote server!"
-  echo ""
-  echo "🔍 Transfer output:"
-  cat "$TRANSFER_LOG" | tail -20 | sed 's/^/   /'
-  echo ""
-  echo "💡 Common issues:"
-  echo "   - Network connectivity problems"
-  echo "   - Insufficient disk space on remote server"
-  echo "   - SSH connection issues"
   exit 1
-fi
-
-# Check for warnings in transfer
-TRANSFER_WARNINGS=$(grep -i "warning" "$TRANSFER_LOG" | wc -l || echo "0")
-if [ "$TRANSFER_WARNINGS" -gt 0 ]; then
-  echo ""
-  echo "⚠️  Image transfer completed with warnings:"
-  grep -i "warning" "$TRANSFER_LOG" | head -3 | sed 's/^/   /'
 fi
 
 echo "✅ Image transferred successfully!"
@@ -153,60 +74,21 @@ echo "✅ Maintenance mode enabled."
 echo "🚀 Restarting services on remote server..."
 
 # Use production override if it exists, otherwise use base compose file
-COMPOSE_CMD="docker compose up -d"
 if ssh ${SSH_OPTS} "${REMOTE_HOST}" "test -f ${REMOTE_DIR}/docker-compose.prod.yml"; then
-  COMPOSE_CMD="docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
-  echo "   Using production override (docker-compose.prod.yml)"
+  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
 else
-  echo "   Using base compose file (docker-compose.yml)"
+  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose up -d"
 fi
 
-# Capture compose output (COMPOSE_LOG already initialized above)
-
-if ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && $COMPOSE_CMD" 2>&1 | tee "$COMPOSE_LOG"; then
-  COMPOSE_EXIT_CODE=0
-else
-  COMPOSE_EXIT_CODE=$?
-fi
-
-if [ $COMPOSE_EXIT_CODE -ne 0 ]; then
-  echo ""
+if [ $? -ne 0 ]; then
   echo "❌ Failed to restart services on remote server!"
-  echo ""
-  echo "🔍 Service restart output:"
-  cat "$COMPOSE_LOG" | sed 's/^/   /'
-  echo ""
-  echo "💡 Check the output above for errors"
   exit 1
 fi
 
-# Check for warnings in compose output
-COMPOSE_WARNINGS=$(grep -i "warning" "$COMPOSE_LOG" | wc -l || echo "0")
-if [ "$COMPOSE_WARNINGS" -gt 0 ]; then
-  echo ""
-  echo "⚠️  Service restart completed with warnings:"
-  grep -i "warning" "$COMPOSE_LOG" | head -5 | sed 's/^/   /'
-  if [ "$COMPOSE_WARNINGS" -gt 5 ]; then
-    echo "   ... and $((COMPOSE_WARNINGS - 5)) more warnings"
-  fi
-fi
-
-echo ""
 echo "✅ Deployment complete!"
 echo ""
 echo "📊 Checking service status..."
-STATUS_OUTPUT=$(ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose ps" 2>&1)
-echo "$STATUS_OUTPUT" | sed 's/^/   /'
-
-# Check for unhealthy or exited containers
-if echo "$STATUS_OUTPUT" | grep -qE "(unhealthy|exited|restarting)"; then
-  echo ""
-  echo "⚠️  Warning: Some containers may not be healthy:"
-  echo "$STATUS_OUTPUT" | grep -E "(unhealthy|exited|restarting)" | sed 's/^/   ⚠️  /'
-  echo ""
-  echo "💡 Check container logs for details:"
-  echo "   ssh ${SSH_USER}@${SERVER_IP} 'cd ${REMOTE_DIR} && docker compose logs <service-name>'"
-fi
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose ps"
 
 echo ""
 echo "📋 Next steps on production server:"
