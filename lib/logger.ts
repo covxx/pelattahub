@@ -64,10 +64,10 @@ export const AuditAction = {
   
   // Integration/Sync
   SYNC: "SYNC",
-
+  
   // Bulk Operations
   BULK_IMPORT: "BULK_IMPORT",
-
+  
   // System Operations
   DATABASE_RESET: "DATABASE_RESET",
   ERROR: "ERROR",

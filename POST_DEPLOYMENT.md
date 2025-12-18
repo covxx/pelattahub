@@ -70,6 +70,34 @@ If you get `{"status":"error"}`, check the logs for database connection issues.
 
 ---
 
+## 📊 4.5. Verify QuickBooks Auto-Sync Service
+
+If you've enabled the QBO auto-sync service, verify it's running:
+
+```bash
+# Check if qbo-sync service is running
+docker compose ps qbo-sync
+
+# View qbo-sync logs
+docker compose logs --tail=50 qbo-sync
+
+# Follow qbo-sync logs in real-time
+docker compose logs -f qbo-sync
+```
+
+**Look for:**
+- ✅ "QBO Auto-Sync Service started successfully"
+- ✅ "Sync interval: Every 1 minute(s)"
+- ✅ "Starting QBO auto-sync cycle" (appears every minute)
+- ✅ Sync completion messages with counts
+
+**If the service is not running:**
+1. Check that `QBO_AUTO_SYNC_ENABLED=true` in your `.env` file
+2. Verify QBO is connected (check the admin dashboard)
+3. Restart the service: `docker compose restart qbo-sync`
+
+---
+
 ## 🔄 5. Restart Services (If Needed)
 
 If you notice any issues, restart the services:
