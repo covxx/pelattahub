@@ -165,31 +165,28 @@ export default function LandingPage() {
             <div className="rounded-2xl border bg-card p-6 shadow-lg shadow-primary/10">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-muted-foreground">Live Snapshot</div>
+                  <div className="text-sm font-medium text-muted-foreground">System Status</div>
                   <div className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                    Warehouse Ready
+                    v{currentVersion.version} {currentVersion.name}
                   </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-3">
                   <div className="rounded-xl border bg-muted/40 p-4">
-                    <div className="text-sm text-muted-foreground">Lots in Motion</div>
-                    <div className="text-3xl font-semibold">142</div>
-                    <div className="text-xs text-muted-foreground">Across receiving, picking, production</div>
+                    <div className="text-sm text-muted-foreground">Current Release</div>
+                    <div className="text-lg font-semibold">v{currentVersion.version} "{currentVersion.name}"</div>
+                    <div className="text-xs text-muted-foreground">Released {currentVersion.releaseDate}</div>
                   </div>
-                  <div className="rounded-xl border bg-muted/40 p-4">
-                    <div className="text-sm text-muted-foreground">On-Time Orders</div>
-                    <div className="text-3xl font-semibold">98%</div>
-                    <div className="text-xs text-muted-foreground">FIFO enforced, label-ready picks</div>
-                  </div>
-                  <div className="rounded-xl border bg-muted/40 p-4">
-                    <div className="text-sm text-muted-foreground">Audit Coverage</div>
-                    <div className="text-3xl font-semibold">100%</div>
-                    <div className="text-xs text-muted-foreground">User + JSON diff on every change</div>
-                  </div>
-                  <div className="rounded-xl border bg-muted/40 p-4">
-                    <div className="text-sm text-muted-foreground">Unit Aware</div>
-                    <div className="text-3xl font-semibold">CASE / LBS</div>
-                    <div className="text-xs text-muted-foreground">Standard case weight respected end-to-end</div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border bg-muted/40 p-4">
+                      <div className="text-sm text-muted-foreground">QuickBooks Sync</div>
+                      <div className="text-2xl font-semibold">Auto</div>
+                      <div className="text-xs text-muted-foreground">Background synchronization enabled</div>
+                    </div>
+                    <div className="rounded-xl border bg-muted/40 p-4">
+                      <div className="text-sm text-muted-foreground">Audit Coverage</div>
+                      <div className="text-2xl font-semibold">100%</div>
+                      <div className="text-xs text-muted-foreground">Every change logged</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -214,6 +211,38 @@ export default function LandingPage() {
               <p className="mt-3 text-sm text-muted-foreground">{feature.detail}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="border-y bg-muted/20">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
+          <div className="space-y-3 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Roadmap</p>
+            <h2 className="text-balance text-3xl font-semibold sm:text-4xl">What's Coming Next</h2>
+            <p className="text-lg text-muted-foreground sm:text-xl">
+              We're continuously improving PalettaHub based on feedback from warehouse teams. Here's what's on the horizon.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            {roadmapItems.map((item) => (
+              <div key={item.title} className="group relative rounded-2xl border bg-card p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-sm font-semibold text-muted-foreground">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold">{item.title}</h3>
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Upcoming</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -250,6 +279,9 @@ export default function LandingPage() {
                   </li>
                   <li className="rounded-lg border bg-muted/30 p-3">
                     Browser-native ZPL printing keeps labels fast and OS-driver friendly—no USB Serial dependencies.
+                  </li>
+                  <li className="rounded-lg border bg-muted/30 p-3">
+                    QuickBooks Online auto-sync keeps customers, products, vendors, and invoices synchronized automatically.
                   </li>
                 </ul>
                 <div className="pt-2 text-sm text-muted-foreground">
