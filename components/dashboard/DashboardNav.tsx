@@ -137,7 +137,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
 
   return (
     <>
-      {/* Sidebar - Hidden on mobile, visible on md and up */}
+      {/* Sidebar - Hidden on mobile (below md breakpoint), visible on md and up */}
       <div className="hidden md:fixed md:inset-y-0 md:z-50 md:flex md:w-64 md:flex-col">
         {/* Sidebar component */}
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 px-6 pb-4">

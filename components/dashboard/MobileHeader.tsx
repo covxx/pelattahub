@@ -138,7 +138,7 @@ export function MobileHeader({ user }: MobileHeaderProps) {
   })
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 shadow-sm md:hidden">
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 shadow-sm">
       {/* Logo */}
       <Link href="/dashboard" className="flex items-center">
         <BoxIcon className="h-8 w-8 text-blue-600" />

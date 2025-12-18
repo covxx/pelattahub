@@ -17,7 +17,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile Header - Only visible on mobile */}
+      {/* Mobile Header - Only visible on mobile (below md breakpoint) */}
       <div className="block md:hidden">
         <MobileHeader user={session.user} />
       </div>
