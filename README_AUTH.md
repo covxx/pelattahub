@@ -2,16 +2,16 @@
 
 ## 🔐 Admin Account Management
 
-### Quick Fix Script
-If you're getting "invalid login" errors, run:
+### Creating Admin Account
+If you need to create or reset an admin account, use the TypeScript script:
 ```bash
-./scripts/ensure-admin-simple.sh
+docker compose exec app npx tsx scripts/create-admin.ts
 ```
 
-This script:
-- ✅ Creates/updates admin account with correct password hash
-- ✅ Works with existing database containers
-- ✅ Uses pre-generated bcrypt hash (no dependencies needed)
+Or run locally (if you have database access):
+```bash
+npx tsx scripts/create-admin.ts
+```
 
 ### Admin Credentials
 - **Email:** `admin@example.com`
@@ -38,20 +38,17 @@ This script:
 
 ## 🔧 Post-Build Setup
 
-After rebuilding containers, run:
+After rebuilding containers, ensure the admin account exists:
 ```bash
-./scripts/post-build-setup.sh
+docker compose exec app npx tsx scripts/create-admin.ts
 ```
 
-This ensures:
-- Database is ready
-- Admin account exists with correct password
-- Authentication system is working
+This creates/updates the admin account with the default credentials.
 
 ## 🚨 Common Issues
 
 ### "Invalid login" after rebuild
-1. Run: `./scripts/ensure-admin-simple.sh`
+1. Run: `docker compose exec app npx tsx scripts/create-admin.ts`
 2. Verify: Check database connection in container logs
 3. Check: DATABASE_URL environment variable matches actual DB password
 
