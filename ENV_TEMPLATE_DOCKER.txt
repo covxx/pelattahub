@@ -32,3 +32,8 @@ EMAIL_USER="sales@srjlabs.com"
 EMAIL_PASSWORD="REPLACE_WITH_APP_PASSWORD"
 EMAIL_FROM="sales@srjlabs.com"
 
+# Cron Job Security
+# Generate with: openssl rand -base64 32
+# Used to secure /api/cron/* endpoints
+CRON_SECRET="REPLACE_WITH_SECRET_TOKEN"
+

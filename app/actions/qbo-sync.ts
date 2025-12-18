@@ -481,9 +481,11 @@ export async function importQboVendors() {
  * Import invoices from QuickBooks Online
  * Creates DRAFT orders in WMS from open QBO invoices
  */
-export async function importQboInvoices() {
-  const session = await requireAdminOrManager()
-
+/**
+ * Internal function to perform QBO invoice sync
+ * Can be called with a system user ID for cron jobs
+ */
+async function performQboInvoiceSync(actorUserId: string) {
   try {
     // Check connection status
     const connectionStatus = await getQboConnectionStatus()
@@ -495,7 +497,6 @@ export async function importQboInvoices() {
     }
 
     // Fetch open invoices from QBO
-    const actorUserId = await resolveUserId(session.user.id)
     const lastSync = await getLastSyncTimestamp("invoices")
     console.log(`[QBO Invoice Sync] Last sync timestamp: ${lastSync ? lastSync.toISOString() : 'never'}`)
     let query = buildSyncQuery("invoices", lastSync)
@@ -682,6 +683,37 @@ export async function importQboInvoices() {
       error: error instanceof Error ? error.message : "Failed to import invoices",
     }
   }
+}
+
+/**
+ * Public function for manual/admin-triggered syncs
+ * Requires admin/manager authentication
+ */
+export async function importQboInvoices() {
+  const session = await requireAdminOrManager()
+  const actorUserId = await resolveUserId(session.user.id)
+  return performQboInvoiceSync(actorUserId)
+}
+
+/**
+ * System function for cron/automated syncs
+ * Does not require authentication but uses system user
+ */
+export async function importQboInvoicesSystem() {
+  // Get first admin/manager user for system actions
+  const systemUser = await prisma.user.findFirst({
+    where: { role: { in: ["ADMIN", "MANAGER"] } } as any,
+    orderBy: { createdAt: "asc" },
+  })
+  
+  if (!systemUser) {
+    return {
+      success: false,
+      error: "No admin/manager user found for system sync",
+    }
+  }
+
+  return performQboInvoiceSync(systemUser.id)
 }
 
 /**

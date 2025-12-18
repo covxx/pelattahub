@@ -105,26 +105,47 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
       return
     }
 
-    const intervalId = setInterval(async () => {
+    console.log("[QBO Auto-Sync] Starting auto-sync interval (runs every 60 seconds)")
+
+    // Run immediately on mount, then every minute
+    const runSync = async () => {
       try {
-        // Silently sync invoices in background
+        console.log("[QBO Auto-Sync] Running scheduled sync...")
         const result = await importQboInvoices()
-        if (result.success && result.imported && result.imported > 0) {
-          setLastSyncResult({ type: "invoices", result, timestamp: new Date() })
+        
+        // Always update lastSyncResult to show sync is working
+        setLastSyncResult({ type: "invoices", result, timestamp: new Date() })
+        
+        if (result.success) {
+          console.log(`[QBO Auto-Sync] Completed: ${result.imported || 0} imported, ${result.skipped || 0} skipped, ${result.total || 0} total`)
+          
           // Only show toast if new invoices were imported
-          toast(
-            `Auto-sync: Imported ${result.imported} orders from QuickBooks invoices`,
-            "success"
-          )
+          if (result.imported && result.imported > 0) {
+            toast(
+              `Auto-sync: Imported ${result.imported} orders from QuickBooks invoices`,
+              "success"
+            )
+          }
+        } else {
+          console.error(`[QBO Auto-Sync] Failed: ${result.error}`)
         }
       } catch (error) {
-        console.error("Auto-sync error:", error)
+        console.error("[QBO Auto-Sync] Error:", error)
         // Don't show error toast for background sync to avoid spam
       }
-    }, 60000) // 1 minute = 60000ms
+    }
 
-    return () => clearInterval(intervalId)
-  }, [connectionStatus.connected, toast])
+    // Run immediately
+    runSync()
+
+    // Then set up interval
+    const intervalId = setInterval(runSync, 60000) // 1 minute = 60000ms
+
+    return () => {
+      console.log("[QBO Auto-Sync] Cleaning up interval")
+      clearInterval(intervalId)
+    }
+  }, [connectionStatus.connected]) // Removed 'toast' from dependencies - it's stable
 
   const handleConnect = async () => {
     try {
@@ -229,10 +250,11 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
         setLastSyncResult({ type: "invoices", result, timestamp: new Date() })
 
         if (result.success) {
-          const message = result.imported > 0 
-            ? `Imported ${result.imported} orders from QuickBooks invoices`
-            : `Found ${result.total || 0} invoices, ${result.imported || 0} imported, ${result.skipped || 0} already exist`
-          toast(message, result.imported > 0 ? "success" : "info")
+          const imported = result.imported || 0
+          const message = imported > 0 
+            ? `Imported ${imported} orders from QuickBooks invoices`
+            : `Found ${result.total || 0} invoices, ${imported} imported, ${result.skipped || 0} already exist`
+          toast(message, imported > 0 ? "success" : "info")
           
           if (result.invoiceIdsFound && result.invoiceIdsFound.length > 0) {
             console.log("Invoice IDs found in QBO:", result.invoiceIdsFound)
