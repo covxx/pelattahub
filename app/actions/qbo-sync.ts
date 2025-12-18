@@ -497,11 +497,18 @@ export async function importQboInvoices() {
     // Fetch open invoices from QBO
     const actorUserId = await resolveUserId(session.user.id)
     const lastSync = await getLastSyncTimestamp("invoices")
+    console.log(`[QBO Invoice Sync] Last sync timestamp: ${lastSync ? lastSync.toISOString() : 'never'}`)
+
     let query = buildSyncQuery("invoices", lastSync)
+    console.log(`[QBO Invoice Sync] Executing query: ${query}`)
     let qboInvoices = await fetchQboByQuery(query)
+    console.log(`[QBO Invoice Sync] Found ${qboInvoices.length} invoices with lastSync filter`)
+
     if (qboInvoices.length === 0 && lastSync) {
       query = buildSyncQuery("invoices", null)
+      console.log(`[QBO Invoice Sync] Retrying with full query: ${query}`)
       qboInvoices = await fetchQboByQuery(query)
+      console.log(`[QBO Invoice Sync] Found ${qboInvoices.length} invoices with full query`)
     }
 
     if (qboInvoices.length === 0) {
@@ -514,6 +521,8 @@ export async function importQboInvoices() {
 
     let imported = 0
     const errors: string[] = []
+
+    console.log(`[QBO Invoice Sync] Processing ${qboInvoices.length} invoices...`)
 
     // Process each invoice
     for (const qboInvoice of qboInvoices) {
@@ -528,8 +537,11 @@ export async function importQboInvoices() {
 
         if (existingOrder) {
           // Skip if already imported
+          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - already imported as order ${existingOrder.id}`)
           continue
         }
+
+        console.log(`[QBO Invoice Sync] Processing invoice ${qboInvoice.DocNumber || qboInvoice.Id}`)
 
         // Find customer by qbo_id
         // Note: Using type assertion because Prisma client types are out of sync with schema
@@ -538,6 +550,7 @@ export async function importQboInvoices() {
         })
 
         if (!customer) {
+          console.log(`[QBO Invoice Sync] Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Customer QBO ID: ${qboInvoice.CustomerRef.value}`)
           errors.push(
             `Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync customers first.`
           )
@@ -562,6 +575,7 @@ export async function importQboInvoices() {
             })
 
             if (!product) {
+              console.log(`[QBO Invoice Sync] Product not found for item ${itemDetail.ItemRef.name} in invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Product QBO ID: ${itemDetail.ItemRef.value}`)
               errors.push(
                 `Product not found for item ${itemDetail.ItemRef.name} in invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync products first.`
               )
@@ -612,8 +626,10 @@ export async function importQboInvoices() {
           } as any,
         })
 
+        console.log(`[QBO Invoice Sync] Successfully imported invoice ${qboInvoice.DocNumber || qboInvoice.Id}`)
         imported++
       } catch (invoiceError) {
+        console.error(`[QBO Invoice Sync] Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}:`, invoiceError)
         errors.push(
           `Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}: ${
             invoiceError instanceof Error ? invoiceError.message : "Unknown error"
@@ -638,6 +654,9 @@ export async function importQboInvoices() {
 
     revalidatePath("/dashboard/admin/integrations/qbo")
     await setLastSyncTimestamp("invoices", new Date())
+
+    console.log(`[QBO Invoice Sync] Completed: ${imported} imported, ${errors.length} errors, ${qboInvoices.length} total processed`)
+
     return {
       success: true,
       imported,
