@@ -5,196 +5,134 @@ This document outlines planned features and improvements for the Warehouse Manag
 ## 🎯 Current Status
 
 The system currently supports:
-- ✅ Lot-based inventory tracking
+- ✅ Lot-based inventory tracking with full traceability
 - ✅ Receiving events with batch processing
-- ✅ PTI-compliant label generation
-- ✅ Admin workspace with master data management
-- ✅ Receiving history and audit logging
-- ✅ Role-based access control
+- ✅ PTI-compliant label generation (ZPL)
+- ✅ Order management with FIFO allocation
+- ✅ Picking interface with lot validation
+- ✅ Production module for batch processing
+- ✅ QuickBooks Online integration with auto-sync service
+- ✅ Customer, product, and vendor management
+- ✅ Recall reporting and traceability explorer
+- ✅ Comprehensive audit logging
+- ✅ Role-based access control (Admin, Manager, Receiver, Packer)
 - ✅ System settings and configuration
+- ✅ Docker-based production deployment
 
 ## 📋 Upcoming Features
 
-### 🔢 Sequential Order Numbering System
-
-**Priority:** Medium  
-**Status:** Planned (Currently using UUIDs)
-
-**Goal:** Implement a user-friendly sequential order numbering system starting from 100001.
-
-**Current Status:**
-- Order model includes optional `order_number` field
-- Migration created to add `order_number` column
-- Currently using UUIDs for order identification due to implementation challenges
-
-**Challenges Encountered:**
-- Prisma client synchronization issues in Docker environment
-- Null constraint violations during order creation
-- Transaction atomicity concerns for sequential number generation
-
-**Planned Implementation:**
-- Generate sequential order numbers atomically within transactions
-- Start numbering from 100001 (or configurable starting point)
-- Ensure thread-safe number generation for concurrent order creation
-- Fallback to UUID if sequential generation fails
-- Display order numbers prominently in UI (with UUID fallback)
-
-**Technical Requirements:**
-- Database sequence or atomic counter for number generation
-- Proper Prisma client regeneration in Docker build process
-- Transaction-based number allocation to prevent duplicates
-- Migration strategy for existing orders
-
-**Expected Outcome:**
-- Human-readable order numbers (e.g., "100001", "100002")
-- Better user experience for order identification
-- Easier order reference in customer communications
-- Maintains backward compatibility with UUID system
-
----
-
-### 🏷️ Print UX Polish
+### 📱 Mobile Version
 
 **Priority:** High  
 **Status:** Planned
 
-**Goal:** Improve the print experience to be seamless and user-friendly.
+**Goal:** Provide a native mobile experience optimized for warehouse operations on tablets and smartphones.
 
-**Tasks:**
-- Fix `printZplViaBrowser` to use a hidden iframe or auto-closing window
-- Implement one-click printing: Click → System Dialog → Done
-- Eliminate lingering popups and manual window management
-- Add print queue management for batch operations
+**Features:**
+- **Responsive Mobile Interface:**
+  - Touch-optimized UI for warehouse kiosks and tablets
+  - Large buttons and clear visual hierarchy
+  - Swipe gestures for common actions
+  - Offline capability for remote warehouse locations
+
+- **Mobile-Specific Features:**
+  - Camera-based barcode scanning
+  - Voice commands for hands-free operation
+  - Push notifications for order updates
+  - Mobile-optimized picking interface
+  - Quick access to frequently used functions
+
+- **Device Support:**
+  - iOS and Android compatibility
+  - Tablet-optimized layouts for warehouse kiosks
+  - Responsive design for various screen sizes
 
 **Expected Outcome:**
-- Streamlined printing workflow
-- No user intervention required after clicking print
-- Better user experience for warehouse staff
+- Improved warehouse staff productivity
+- Better user experience on mobile devices
+- Support for remote warehouse operations
+- Reduced training time for new users
 
 ---
 
-### 🚚 Outbound Order Management
+### 🌙 Dark Mode
+
+**Priority:** Medium  
+**Status:** Planned
+
+**Goal:** Implement system-wide dark theme support for improved usability in low-light warehouse environments.
+
+**Features:**
+- **Theme Toggle:**
+  - User preference setting
+  - System-wide theme application
+  - Persistent theme selection (saved per user)
+  - Automatic theme switching based on system preferences (optional)
+
+- **Design Considerations:**
+  - High contrast for readability in various lighting conditions
+  - Reduced eye strain for extended use
+  - Consistent color scheme across all components
+  - Accessibility compliance (WCAG standards)
+
+- **Implementation:**
+  - Tailwind CSS dark mode support
+  - Component-level theme variants
+  - Smooth theme transitions
+  - Print-friendly dark mode (optional)
+
+**Expected Outcome:**
+- Better visibility in low-light warehouse environments
+- Reduced eye strain for warehouse staff
+- Modern, professional appearance
+- Improved user experience
+
+---
+
+### 🛡️ Food Safety Features
 
 **Priority:** High  
 **Status:** Planned
 
-**Goal:** Complete order-to-shipment workflow with intelligent lot allocation.
+**Goal:** Enhanced food safety compliance, tracking, and reporting capabilities for fresh produce operations.
 
-#### Order Entry
-- Admin interface to create Sales Orders
-- Customer selection and order item entry
-- Order status tracking (Draft, Confirmed, Allocated, Picked, Shipped)
+**Features:**
+- **HACCP Compliance:**
+  - Critical Control Point (CCP) tracking
+  - Temperature monitoring and alerts
+  - Sanitation schedule management
+  - Compliance documentation and reporting
 
-#### Allocation Logic
-- **FIFO (First-In-First-Out) Algorithm:**
-  - Automatically suggest specific Lots based on expiry dates
-  - Prioritize oldest lots first to minimize waste
-  - Consider lot status (AVAILABLE, QC_PENDING, etc.)
-  - Handle partial lot allocation
-  - Visual allocation preview before confirmation
+- **Allergen Management:**
+  - Allergen tracking at product and lot level
+  - Allergen cross-contamination warnings
+  - Allergen labeling and documentation
+  - Customer allergen notification system
 
-#### Fulfillment
-- Warehouse view to "Pick" items from allocated lots
-- Barcode scanning for lot validation during picking
-- Pick confirmation and quantity verification
-- Integration with label printing for shipping labels
-- Pick list generation and tracking
+- **Quality Control Enhancements:**
+  - Enhanced QC checkpoints and workflows
+  - Photo/document attachments for QC records
+  - QC hold and release processes with approval workflows
+  - Quality metrics and trend analysis
 
-**Expected Outcome:**
-- Complete order-to-shipment workflow
-- Reduced waste through intelligent lot allocation
-- Accurate picking with barcode validation
-- Full traceability from order to shipment
+- **Traceability Improvements:**
+  - Enhanced recall capabilities with instant lot identification
+  - Supplier traceability with certification tracking
+  - Batch tracking through production processes
+  - Export capabilities for regulatory compliance
 
----
-
-### 📄 Document Generation (PDFs)
-
-**Priority:** Medium  
-**Status:** Planned
-
-**Goal:** Generate professional, downloadable PDF documents for key business processes.
-
-#### Receiving Documents
-- **Receiving Receipt PDF:**
-  - Professional format for vendor records
-  - Include all lot details, quantities, and timestamps
-  - Company branding and contact information
-  - Downloadable and printable
-
-#### Shipping Documents
-- **Bill of Lading (BOL):**
-  - Standard BOL format
-  - Customer and shipping information
-  - Itemized list of shipped products and lots
-  - Carrier information and tracking numbers
-
-- **Packing Slips:**
-  - Customer-facing packing list
-  - Item descriptions and quantities
-  - Lot numbers for traceability
-  - Order number and shipping date
-
-**Technical Implementation:**
-- Use `react-pdf` or `@react-pdf/renderer` for high-fidelity PDF generation
-- Server-side PDF generation for better performance
-- Template-based design for consistency
-- Downloadable files with proper naming conventions
+- **Food Safety Reporting:**
+  - Compliance reports for audits
+  - Temperature logs and trend analysis
+  - Sanitation records and schedules
+  - Incident tracking and corrective actions
 
 **Expected Outcome:**
-- Professional documentation for all transactions
-- Improved record-keeping and compliance
-- Better customer experience with clear documentation
-
----
-
-### 💰 QuickBooks Online (QBO) Integration
-
-**Priority:** Medium  
-**Status:** Planned
-
-**Goal:** Two-way synchronization with QuickBooks Online for seamless accounting integration.
-
-#### Two-Way Sync Architecture
-
-**Customers:**
-- **QBO → WMS:** Read-only customer data sync
-  - Automatic import of customer records from QuickBooks
-  - Customer name, address, contact information
-  - Sync frequency: Real-time or scheduled (configurable)
-  - Conflict resolution: QBO is source of truth
-
-**Items/Products:**
-- **QBO → WMS:** Master data source synchronization
-  - Product/SKU information from QuickBooks
-  - Pricing, descriptions, and categorization
-  - Automatic updates when QBO data changes
-  - WMS extends QBO data with warehouse-specific fields (GTIN, lot tracking, etc.)
-
-**Invoices:**
-- **QBO → WMS:** Invoice data synchronization
-  - Import invoice information for order fulfillment
-  - Link WMS sales orders to QBO invoices
-  - Track invoice status and payment information
-  - Support for credit memos and adjustments
-
-**WMS → QBO:** (Future Phase)
-- Export receiving events as bills/vendor credits
-- Export shipments as sales receipts
-- Inventory quantity synchronization
-
-#### Technical Requirements
-- QuickBooks Online API integration
-- OAuth 2.0 authentication flow
-- Webhook support for real-time updates
-- Error handling and retry logic
-- Sync status dashboard for administrators
-
-**Expected Outcome:**
-- Eliminate manual data entry between systems
-- Real-time financial data visibility
-- Accurate inventory and accounting alignment
-- Reduced errors and improved efficiency
+- Enhanced food safety compliance
+- Faster recall response times
+- Better quality control processes
+- Improved regulatory compliance documentation
+- Reduced food safety risks
 
 ---
 
@@ -206,27 +144,25 @@ The system currently supports:
   - Inventory turnover reports
   - Expiry tracking and waste analysis
   - Vendor performance metrics
-  - Customer order history
-
-- **Mobile App:**
-  - Native mobile app for warehouse operations
-  - Barcode scanning with device camera
-  - Offline capability for remote locations
+  - Customer order history and trends
 
 - **Multi-Warehouse Support:**
   - Multiple warehouse locations
   - Inter-warehouse transfers
   - Location-based inventory tracking
-
-- **Advanced Quality Control:**
-  - QC checkpoints and workflows
-  - Photo/document attachments
-  - QC hold and release processes
+  - Centralized inventory visibility
 
 - **API & Integrations:**
   - RESTful API for third-party integrations
   - Webhook support for external systems
   - EDI support for large customers
+  - Additional accounting software integrations
+
+- **Advanced Features:**
+  - Sequential order numbering system
+  - Enhanced print UX improvements
+  - Document generation (PDF receipts, BOL, packing slips)
+  - Advanced inventory forecasting
 
 ---
 
@@ -235,10 +171,10 @@ The system currently supports:
 - Features are prioritized based on business needs and user feedback
 - Timeline estimates will be added as development progresses
 - Breaking changes will be documented in release notes
-- See `KNOWN_ISSUES.md` for current system limitations
+- Current release: v1.1 "Orion" (December 18, 2025)
 
 ---
 
-*Last Updated: November 30, 2025*
+*Last Updated: December 18, 2025*
 
 
