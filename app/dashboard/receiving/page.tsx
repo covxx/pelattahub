@@ -17,17 +17,17 @@ export default async function ReceivingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
             Batch Receiving
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
             Receive multiple items from a vendor and print labels
           </p>
         </div>
-        <Link href="/dashboard/receiving/history">
-          <Button variant="outline">
+        <Link href="/dashboard/receiving/history" className="self-start sm:self-auto">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <History className="h-4 w-4 mr-2" />
             View Receiving History
           </Button>
