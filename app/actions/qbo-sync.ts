@@ -569,9 +569,6 @@ export async function importQboInvoices() {
             docNumber: qboInvoice.DocNumber,
             reason: skipReason
           })
-          errors.push(
-            `Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync customers first.`
-          )
           continue
         }
 
@@ -617,9 +614,6 @@ export async function importQboInvoices() {
             docNumber: qboInvoice.DocNumber,
             reason: skipReason
           })
-          errors.push(
-            `No valid items found in invoice ${qboInvoice.DocNumber || qboInvoice.Id}`
-          )
           continue
         }
 
