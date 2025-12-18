@@ -254,7 +254,7 @@ export async function getLotLifecycle(lotId: string) {
   })
 
   // Get all audit logs for this lot
-  const auditTrail = await prisma.auditLog.findMany({
+  const lotAuditLogs = await prisma.auditLog.findMany({
     where: {
       entity_type: "LOT",
       entity_id: lotId,
@@ -273,11 +273,89 @@ export async function getLotLifecycle(lotId: string) {
     },
   })
 
+  // Also get audit logs for the receiving event (if lot was received)
+  let receivingEventAuditLogs: any[] = []
+  const lotWithEvent = lot as any
+  if (lotWithEvent.receivingEvent?.id) {
+    receivingEventAuditLogs = await prisma.auditLog.findMany({
+      where: {
+        entity_type: "RECEIVING_EVENT",
+        entity_id: lotWithEvent.receivingEvent.id,
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
+  }
+
+  // Combine and sort all audit logs by date (most recent first)
+  const auditTrail = [...lotAuditLogs, ...receivingEventAuditLogs].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+
+  // Get outbound shipping history - orders where this lot was picked
+  let outboundHistory: any[] = []
+  try {
+    outboundHistory = await prisma.orderPick.findMany({
+      where: {
+        inventory_lot_id: lotId,
+      },
+      include: {
+        order_item: {
+          include: {
+            order: {
+              include: {
+                customer: {
+                  select: {
+                    id: true,
+                    name: true,
+                    code: true,
+                  },
+                },
+              },
+            },
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                unit_type: true,
+              },
+            },
+          },
+        },
+        picked_by_user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        picked_at: "desc",
+      },
+    })
+  } catch (error) {
+    console.error("Error fetching outbound history:", error)
+    // Return empty array if query fails - don't break the entire page
+    outboundHistory = []
+  }
+
   return {
     lot,
     auditTrail,
     parentProductionRun,
     childProductionRuns,
+    outboundHistory,
   }
 }
 

@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Search, Package, Truck, Calendar, User, AlertCircle, ArrowRight, ArrowLeft, Link2 } from "lucide-react"
+import { Search, Package, Truck, Calendar, User, AlertCircle, ArrowRight, ArrowLeft, Link2, Printer, FileText } from "lucide-react"
 import { searchTraceability, getLotLifecycle } from "@/app/actions/admin/audit"
 
 export function TraceabilityExplorer() {
@@ -38,6 +38,274 @@ export function TraceabilityExplorer() {
       setLotLifecycle(data)
       setSheetOpen(true)
     })
+  }
+
+  const handlePrintReport = () => {
+    if (!lotLifecycle) return
+
+    // Create a printable report window
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) {
+      alert("Please allow popups to print the report")
+      return
+    }
+
+    const lot = lotLifecycle.lot
+    const reportHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lot History Report - ${lot.lot_number}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      color: #333;
+    }
+    .header {
+      border-bottom: 3px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .section {
+      margin-bottom: 30px;
+      page-break-inside: avoid;
+    }
+    .section-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #666;
+      padding-bottom: 5px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .info-item {
+      padding: 5px 0;
+    }
+    .info-label {
+      font-weight: bold;
+      color: #666;
+      font-size: 12px;
+    }
+    .info-value {
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      font-size: 12px;
+    }
+    th {
+      background-color: #f5f5f5;
+      font-weight: bold;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .status-shipped { background-color: #d4edda; color: #155724; }
+    .status-ready { background-color: #e2d5f7; color: #5a2d91; }
+    .status-other { background-color: #e9ecef; color: #495057; }
+    @media print {
+      body { padding: 10px; }
+      .section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Lot History Report</h1>
+    <p>Generated: ${format(new Date(), "MMM dd, yyyy 'at' HH:mm:ss")}</p>
+  </div>
+
+  <!-- Lot Information -->
+  <div class="section">
+    <div class="section-title">Lot Information</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Lot Number</div>
+        <div class="info-value">${lot.lot_number}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Product</div>
+        <div class="info-value">${lot.product.name}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">SKU</div>
+        <div class="info-value">${lot.product.sku}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">GTIN</div>
+        <div class="info-value">${lot.product.gtin || "N/A"}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Original Quantity</div>
+        <div class="info-value">${lot.original_quantity} ${lot.product.unit_type}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Current Quantity</div>
+        <div class="info-value">${lot.quantity_current} ${lot.product.unit_type}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Received Date</div>
+        <div class="info-value">${format(new Date(lot.received_date), "MMM dd, yyyy")}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Expiry Date</div>
+        <div class="info-value">${format(new Date(lot.expiry_date), "MMM dd, yyyy")}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Status</div>
+        <div class="info-value">${lot.status}</div>
+      </div>
+      ${lot.receivingEvent ? `
+      <div class="info-item">
+        <div class="info-label">Vendor</div>
+        <div class="info-value">${lot.receivingEvent.vendor.name} (${lot.receivingEvent.vendor.code})</div>
+      </div>
+      ` : ""}
+    </div>
+  </div>
+
+  ${lotLifecycle.outboundHistory && lotLifecycle.outboundHistory.length > 0 ? `
+  <!-- Outbound Shipping History -->
+  <div class="section">
+    <div class="section-title">Outbound Shipping History</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th>PO #</th>
+          <th>Product</th>
+          <th>Quantity</th>
+          <th>Picked Date</th>
+          <th>Picked By</th>
+          <th>Status</th>
+          <th>Delivery Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lotLifecycle.outboundHistory.map((pick: any) => {
+          const order = pick.order_item.order
+          return `
+          <tr>
+            <td>${order.order_number || order.id.slice(0, 8).toUpperCase()}</td>
+            <td>${order.customer.name}</td>
+            <td>${order.po_number || "N/A"}</td>
+            <td>${pick.order_item?.product?.name}</td>
+            <td>${pick.quantity_picked} ${pick.order_item?.product?.unit_type}</td>
+            <td>${format(new Date(pick.picked_at), "MMM dd, yyyy HH:mm")}</td>
+            <td>${pick.picked_by_user?.name || "Unknown"}</td>
+            <td><span class="status-badge ${order.status === "SHIPPED" ? "status-shipped" : order.status === "READY_TO_SHIP" ? "status-ready" : "status-other"}">${order.status}</span></td>
+            <td>${order.delivery_date ? format(new Date(order.delivery_date), "MMM dd, yyyy") : "N/A"}</td>
+          </tr>
+          `
+        }).join("")}
+      </tbody>
+    </table>
+  </div>
+  ` : ""}
+
+  <!-- Audit Trail -->
+  <div class="section">
+    <div class="section-title">Audit Trail</div>
+    ${lotLifecycle.auditTrail.length > 0 ? `
+    <table>
+      <thead>
+        <tr>
+          <th>Date/Time</th>
+          <th>Action</th>
+          <th>User</th>
+          <th>Role</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lotLifecycle.auditTrail.map((log: any) => `
+        <tr>
+          <td>${format(new Date(log.createdAt), "MMM dd, yyyy HH:mm:ss")}</td>
+          <td>${log.action}</td>
+          <td>${log.user.name || log.user.email}</td>
+          <td>${log.user.role}</td>
+          <td>${log.details?.summary || "No description"}</td>
+        </tr>
+        `).join("")}
+      </tbody>
+    </table>
+    ` : "<p>No audit history available</p>"}
+  </div>
+
+  ${lotLifecycle.parentProductionRun ? `
+  <!-- Source Ingredient -->
+  <div class="section">
+    <div class="section-title">Source Ingredient</div>
+    <p>This lot was produced from Lot #${lotLifecycle.lot.parentLot.lot_number}</p>
+    <p>Production Date: ${format(new Date(lotLifecycle.parentProductionRun.created_at), "MMM dd, yyyy 'at' HH:mm")}</p>
+    ${lotLifecycle.parentProductionRun.user ? `<p>Produced by: ${lotLifecycle.parentProductionRun.user.name}</p>` : ""}
+  </div>
+  ` : ""}
+
+  ${lotLifecycle.childProductionRuns && lotLifecycle.childProductionRuns.length > 0 ? `
+  <!-- Downstream Products -->
+  <div class="section">
+    <div class="section-title">Downstream Products</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Destination Lot</th>
+          <th>Product</th>
+          <th>Quantity Consumed</th>
+          <th>Quantity Produced</th>
+          <th>Production Date</th>
+          <th>Produced By</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lotLifecycle.childProductionRuns.map((run: any) => `
+        <tr>
+          <td>${run.destinationLot.lot_number}</td>
+          <td>${run.destinationLot.product.name}</td>
+          <td>${run.quantity_consumed}</td>
+          <td>${run.quantity_produced}</td>
+          <td>${format(new Date(run.created_at), "MMM dd, yyyy HH:mm")}</td>
+          <td>${run.user?.name || "Unknown"}</td>
+        </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  </div>
+  ` : ""}
+
+</body>
+</html>
+    `
+
+    printWindow.document.write(reportHtml)
+    printWindow.document.close()
+    
+    // Wait for content to load, then print
+    setTimeout(() => {
+      printWindow.print()
+    }, 250)
   }
 
   return (
@@ -310,10 +578,23 @@ export function TraceabilityExplorer() {
           {lotLifecycle && lotLifecycle.lot && (
             <>
               <SheetHeader>
-                <SheetTitle>Lot Lifecycle</SheetTitle>
-                <SheetDescription>
-                  Complete audit trail for {lotLifecycle.lot.lot_number}
-                </SheetDescription>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <SheetTitle>Lot Lifecycle</SheetTitle>
+                    <SheetDescription>
+                      Complete audit trail for {lotLifecycle.lot.lot_number}
+                    </SheetDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePrintReport()}
+                    className="ml-4"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Report
+                  </Button>
+                </div>
               </SheetHeader>
 
               <div className="space-y-6 mt-6">
@@ -615,16 +896,96 @@ export function TraceabilityExplorer() {
                   </CardContent>
                 </Card>
 
-                {/* Future Placeholder */}
-                <Card className="border-dashed">
-                  <CardContent className="pt-6 text-center text-muted-foreground">
-                    <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Outbound shipping history coming soon</p>
-                    <p className="text-xs mt-1">
-                      Will show orders this lot was shipped on
-                    </p>
-                  </CardContent>
-                </Card>
+                {/* Outbound Shipping History */}
+                {lotLifecycle.outboundHistory && lotLifecycle.outboundHistory.length > 0 && (
+                  <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Truck className="h-5 w-5 text-purple-600" />
+                        Outbound Shipping History
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {lotLifecycle.outboundHistory.map((pick: any) => {
+                          const order = pick.order_item?.order
+                          return (
+                            <div
+                              key={pick.id}
+                              className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-purple-200"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1 flex-1">
+                                  <div className="font-semibold text-base">
+                                    Order #{order.order_number || order.id.slice(0, 8).toUpperCase()}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    Customer: {order.customer.name}
+                                    {order.customer.code && ` (${order.customer.code})`}
+                                  </div>
+                                  {order.po_number && (
+                                    <div className="text-sm text-muted-foreground">
+                                      PO #: {order.po_number}
+                                    </div>
+                                  )}
+                                  <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                                    <div>
+                                      <Calendar className="h-3 w-3 inline mr-1" />
+                                      Picked: {format(new Date(pick.picked_at), "MMM dd, yyyy 'at' HH:mm")}
+                                    </div>
+                                    {pick.picked_by_user && (
+                                      <div>
+                                        <User className="h-3 w-3 inline mr-1" />
+                                        By {pick.picked_by_user.name}
+                                      </div>
+                                    )}
+                                    <div className="text-xs font-medium mt-1">
+                                      Quantity: {pick.quantity_picked} {pick.order_item?.product?.unit_type}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Product: {pick.order_item?.product?.name} (SKU: {pick.order_item?.product?.sku})
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="ml-4">
+                                  <span
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                      order.status === "SHIPPED"
+                                        ? "bg-green-100 text-green-800"
+                                        : order.status === "READY_TO_SHIP"
+                                        ? "bg-purple-100 text-purple-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {order.status}
+                                  </span>
+                                  {order.delivery_date && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      Delivery: {format(new Date(order.delivery_date), "MM/dd/yyyy")}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* No Outbound History */}
+                {(!lotLifecycle.outboundHistory || lotLifecycle.outboundHistory.length === 0) && (
+                  <Card className="border-dashed">
+                    <CardContent className="pt-6 text-center text-muted-foreground">
+                      <Truck className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No outbound shipping history</p>
+                      <p className="text-xs mt-1">
+                        This lot has not been picked for any orders yet
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </>
           )}

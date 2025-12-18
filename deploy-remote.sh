@@ -73,7 +73,12 @@ echo "✅ Maintenance mode enabled."
 
 echo "🚀 Restarting services on remote server..."
 
-ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose up -d"
+# Use production override if it exists, otherwise use base compose file
+if ssh ${SSH_OPTS} "${REMOTE_HOST}" "test -f ${REMOTE_DIR}/docker-compose.prod.yml"; then
+  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
+else
+  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose up -d"
+fi
 
 if [ $? -ne 0 ]; then
   echo "❌ Failed to restart services on remote server!"

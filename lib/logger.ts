@@ -70,6 +70,7 @@ export const AuditAction = {
   
   // System Operations
   DATABASE_RESET: "DATABASE_RESET",
+  ERROR: "ERROR",
   
   // Access
   LOGIN: "LOGIN",
@@ -87,6 +88,7 @@ export const EntityType = {
   CUSTOMER: "CUSTOMER",
   USER: "USER",
   ORDER: "ORDER",
+  SYSTEM: "SYSTEM",
 } as const
 
 
