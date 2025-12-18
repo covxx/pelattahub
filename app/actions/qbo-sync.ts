@@ -521,8 +521,12 @@ export async function importQboInvoices() {
 
     let imported = 0
     const errors: string[] = []
+    const skipped: string[] = []
+    const skippedDetails: Array<{invoiceId: string, docNumber?: string, reason: string}> = []
+    const invoiceIdsFound = qboInvoices.map(inv => inv.Id)
 
     console.log(`[QBO Invoice Sync] Processing ${qboInvoices.length} invoices...`)
+    console.log(`[QBO Invoice Sync] Invoice IDs found: ${JSON.stringify(invoiceIdsFound)}`)
 
     // Process each invoice
     for (const qboInvoice of qboInvoices) {
@@ -537,7 +541,14 @@ export async function importQboInvoices() {
 
         if (existingOrder) {
           // Skip if already imported
-          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - already imported as order ${existingOrder.id}`)
+          const skipReason = `Already imported as order ${existingOrder.id}`
+          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - ${skipReason}`)
+          skipped.push(qboInvoice.Id)
+          skippedDetails.push({
+            invoiceId: qboInvoice.Id,
+            docNumber: qboInvoice.DocNumber,
+            reason: skipReason
+          })
           continue
         }
 
@@ -550,7 +561,14 @@ export async function importQboInvoices() {
         })
 
         if (!customer) {
-          console.log(`[QBO Invoice Sync] Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Customer QBO ID: ${qboInvoice.CustomerRef.value}`)
+          const skipReason = `Customer not found (QBO ID: ${qboInvoice.CustomerRef.value}). Please sync customers first.`
+          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - ${skipReason}`)
+          skipped.push(qboInvoice.Id)
+          skippedDetails.push({
+            invoiceId: qboInvoice.Id,
+            docNumber: qboInvoice.DocNumber,
+            reason: skipReason
+          })
           errors.push(
             `Customer not found for invoice ${qboInvoice.DocNumber || qboInvoice.Id}. Please sync customers first.`
           )
@@ -591,6 +609,14 @@ export async function importQboInvoices() {
         }
 
         if (orderItems.length === 0) {
+          const skipReason = `No valid items found in invoice`
+          console.log(`[QBO Invoice Sync] Skipping invoice ${qboInvoice.DocNumber || qboInvoice.Id} - ${skipReason}`)
+          skipped.push(qboInvoice.Id)
+          skippedDetails.push({
+            invoiceId: qboInvoice.Id,
+            docNumber: qboInvoice.DocNumber,
+            reason: skipReason
+          })
           errors.push(
             `No valid items found in invoice ${qboInvoice.DocNumber || qboInvoice.Id}`
           )
@@ -655,12 +681,20 @@ export async function importQboInvoices() {
     revalidatePath("/dashboard/admin/integrations/qbo")
     await setLastSyncTimestamp("invoices", new Date())
 
-    console.log(`[QBO Invoice Sync] Completed: ${imported} imported, ${errors.length} errors, ${qboInvoices.length} total processed`)
+    console.log(`[QBO Invoice Sync] Completed: ${imported} imported, ${skipped.length} skipped, ${errors.length} errors, ${qboInvoices.length} total processed`)
+    console.log(`[QBO Invoice Sync] Invoice IDs found: ${JSON.stringify(invoiceIdsFound)}`)
+    console.log(`[QBO Invoice Sync] Skipped invoice IDs: ${JSON.stringify(skipped)}`)
+    if (skippedDetails.length > 0) {
+      console.log(`[QBO Invoice Sync] Skip details:`, skippedDetails)
+    }
 
     return {
       success: true,
       imported,
+      skipped: skipped.length,
       total: qboInvoices.length,
+      invoiceIdsFound,
+      skippedDetails: skippedDetails.length > 0 ? skippedDetails : undefined,
       errors: errors.length > 0 ? errors : undefined,
     }
   } catch (error) {

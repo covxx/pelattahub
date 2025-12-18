@@ -293,7 +293,37 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
     try {
       const result = await runManualFullSync()
       if (result.success) {
-        toast("Full sync completed successfully", "success")
+        // Build detailed success message
+        const invoiceResult = result.results?.invoices
+        let message = "Full sync completed successfully"
+
+        if (invoiceResult) {
+          const found = invoiceResult.total || 0
+          const imported = invoiceResult.imported || 0
+          const skipped = invoiceResult.skipped || 0
+          const errors = result.errors?.length || 0
+
+          message = `Sync complete: ${found} invoices found, ${imported} imported, ${skipped} skipped`
+
+          // Log detailed results to console
+          console.log("QBO Sync Results:", {
+            customers: result.results?.customers,
+            products: result.results?.products,
+            vendors: result.results?.vendors,
+            invoices: invoiceResult
+          })
+
+          if (invoiceResult.invoiceIdsFound) {
+            console.log("Invoice IDs found:", invoiceResult.invoiceIdsFound)
+          }
+
+          if (invoiceResult.skippedDetails) {
+            console.log("Skipped invoice details:", invoiceResult.skippedDetails)
+          }
+        }
+
+        toast(message, "success")
+
         if (result.errors && result.errors.length > 0) {
           toast(
             `${result.errors.length} errors occurred. Check console for details.`,
