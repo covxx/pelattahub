@@ -99,6 +99,33 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
     }
   }, [searchParams, toast])
 
+  // Auto-sync invoices every minute when connected
+  useEffect(() => {
+    if (!connectionStatus.connected) {
+      return
+    }
+
+    const intervalId = setInterval(async () => {
+      try {
+        // Silently sync invoices in background
+        const result = await importQboInvoices()
+        if (result.success && result.imported && result.imported > 0) {
+          setLastSyncResult({ type: "invoices", result, timestamp: new Date() })
+          // Only show toast if new invoices were imported
+          toast(
+            `Auto-sync: Imported ${result.imported} orders from QuickBooks invoices`,
+            "success"
+          )
+        }
+      } catch (error) {
+        console.error("Auto-sync error:", error)
+        // Don't show error toast for background sync to avoid spam
+      }
+    }, 60000) // 1 minute = 60000ms
+
+    return () => clearInterval(intervalId)
+  }, [connectionStatus.connected, toast])
+
   const handleConnect = async () => {
     try {
       // Get the OAuth URL from server action
@@ -202,10 +229,19 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
         setLastSyncResult({ type: "invoices", result, timestamp: new Date() })
 
         if (result.success) {
-          toast(
-            `Imported ${result.imported} orders from QuickBooks invoices`,
-            "success"
-          )
+          const message = result.imported > 0 
+            ? `Imported ${result.imported} orders from QuickBooks invoices`
+            : `Found ${result.total || 0} invoices, ${result.imported || 0} imported, ${result.skipped || 0} already exist`
+          toast(message, result.imported > 0 ? "success" : "info")
+          
+          if (result.invoiceIdsFound && result.invoiceIdsFound.length > 0) {
+            console.log("Invoice IDs found in QBO:", result.invoiceIdsFound)
+          }
+          
+          if (result.skippedDetails && result.skippedDetails.length > 0) {
+            console.log("Skipped invoices:", result.skippedDetails)
+          }
+          
           if (result.errors && result.errors.length > 0) {
             toast(
               `${result.errors.length} errors occurred. Check console for details.`,

@@ -497,14 +497,20 @@ export async function importQboInvoices() {
     // Fetch open invoices from QBO
     const actorUserId = await resolveUserId(session.user.id)
     const lastSync = await getLastSyncTimestamp("invoices")
+    console.log(`[QBO Invoice Sync] Last sync timestamp: ${lastSync ? lastSync.toISOString() : 'never'}`)
     let query = buildSyncQuery("invoices", lastSync)
+    console.log(`[QBO Invoice Sync] Executing query: ${query}`)
     let qboInvoices = await fetchQboByQuery(query)
+    console.log(`[QBO Invoice Sync] Found ${qboInvoices.length} invoices with lastSync filter`)
     if (qboInvoices.length === 0 && lastSync) {
       query = buildSyncQuery("invoices", null)
+      console.log(`[QBO Invoice Sync] Retrying with full query: ${query}`)
       qboInvoices = await fetchQboByQuery(query)
+      console.log(`[QBO Invoice Sync] Found ${qboInvoices.length} invoices with full query`)
     }
 
     if (qboInvoices.length === 0) {
+      console.log(`[QBO Invoice Sync] No invoices found - returning success with 0 imported`)
       return {
         success: true,
         imported: 0,
@@ -514,22 +520,34 @@ export async function importQboInvoices() {
 
     let imported = 0
     const errors: string[] = []
+    const skipped: string[] = []
+    const invoiceIds = qboInvoices.map(inv => inv.DocNumber || inv.Id)
+
+    console.log(`[QBO Invoice Sync] Processing ${qboInvoices.length} invoices`)
+    console.log(`[QBO Invoice Sync] Invoice IDs found: ${invoiceIds.join(', ')}`)
 
     // Process each invoice
     for (const qboInvoice of qboInvoices) {
+      const invoiceId = qboInvoice.DocNumber || qboInvoice.Id
+      const qboId = qboInvoice.Id
       try {
         // Check if order already exists for this invoice
         // Note: Using type assertion because Prisma client types are out of sync with schema
         const existingOrder = await prisma.order.findFirst({
           where: {
-            qbo_id: qboInvoice.Id,
+            qbo_id: qboId,
           } as any,
         })
 
         if (existingOrder) {
           // Skip if already imported
+          const skipReason = `Invoice ${invoiceId} (QBO ID: ${qboId}) - already imported as order ${existingOrder.id}`
+          console.log(`[QBO Invoice Sync] Skipping: ${skipReason}`)
+          skipped.push(skipReason)
           continue
         }
+        
+        console.log(`[QBO Invoice Sync] Processing invoice ${invoiceId} (QBO ID: ${qboId})`)
 
         // Find customer by qbo_id
         // Note: Using type assertion because Prisma client types are out of sync with schema
@@ -613,14 +631,18 @@ export async function importQboInvoices() {
         })
 
         imported++
+        console.log(`[QBO Invoice Sync] Successfully imported invoice ${qboInvoice.DocNumber || qboInvoice.Id}`)
       } catch (invoiceError) {
-        errors.push(
-          `Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}: ${
-            invoiceError instanceof Error ? invoiceError.message : "Unknown error"
-          }`
-        )
+        const errorMsg = `Failed to import invoice ${qboInvoice.DocNumber || qboInvoice.Id}: ${
+          invoiceError instanceof Error ? invoiceError.message : "Unknown error"
+        }`
+        errors.push(errorMsg)
+        console.error(`[QBO Invoice Sync] ${errorMsg}`, invoiceError)
       }
     }
+
+    console.log(`[QBO Invoice Sync] Completed: ${imported} imported, ${skipped.length} skipped, ${errors.length} errors`)
+    console.log(`[QBO Invoice Sync] Skipped invoices: ${skipped.join('; ')}`)
 
     // Log activity
     await logActivity(
@@ -632,6 +654,7 @@ export async function importQboInvoices() {
         summary: `Imported ${imported} orders from QuickBooks Online invoices`,
         imported,
         total: qboInvoices.length,
+        skipped: skipped.length,
         errors: errors.length > 0 ? errors : undefined,
       }
     )
@@ -642,6 +665,9 @@ export async function importQboInvoices() {
       success: true,
       imported,
       total: qboInvoices.length,
+      skipped: skipped.length,
+      skippedDetails: skipped.length > 0 ? skipped : undefined,
+      invoiceIdsFound: invoiceIds,
       errors: errors.length > 0 ? errors : undefined,
     }
   } catch (error) {
