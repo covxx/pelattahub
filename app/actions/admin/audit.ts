@@ -275,11 +275,12 @@ export async function getLotLifecycle(lotId: string) {
 
   // Also get audit logs for the receiving event (if lot was received)
   let receivingEventAuditLogs: any[] = []
-  if (lot.receivingEvent?.id) {
+  const lotWithEvent = lot as any
+  if (lotWithEvent.receivingEvent?.id) {
     receivingEventAuditLogs = await prisma.auditLog.findMany({
       where: {
         entity_type: "RECEIVING_EVENT",
-        entity_id: lot.receivingEvent.id,
+        entity_id: lotWithEvent.receivingEvent.id,
       },
       include: {
         user: {
