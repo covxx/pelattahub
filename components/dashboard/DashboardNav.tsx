@@ -137,11 +137,8 @@ export function DashboardNav({ user }: DashboardNavProps) {
 
   return (
     <>
-      {/* Mobile sidebar backdrop */}
-      <div className="lg:hidden fixed inset-0 z-40 bg-gray-900/80" aria-hidden="true" />
-
-      {/* Sidebar */}
-      <div className="fixed inset-y-0 z-50 flex w-64 flex-col">
+      {/* Sidebar - Hidden on mobile (below md breakpoint), visible on md and up */}
+      <div className="hidden md:fixed md:inset-y-0 md:z-50 md:flex md:w-64 md:flex-col">
         {/* Sidebar component */}
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 px-6 pb-4">
           {/* Logo */}
