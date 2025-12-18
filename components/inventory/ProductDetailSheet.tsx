@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Printer, Edit, History, X } from "lucide-react"
-import { generatePTILabel } from "@/lib/zpl-generator"
+import { Printer, Edit, History, X, Package } from "lucide-react"
+import { generatePTILabel, generateMasterLabel } from "@/lib/zpl-generator"
 import { printZplViaBrowser } from "@/lib/print-service"
 import { getCompanySettings } from "@/app/actions/settings"
+import { getLotWithReceivingEvent } from "@/app/actions/inventory"
 import { useToast } from "@/hooks/useToast"
 import { ToastContainer } from "@/components/ui/toast"
 import { InventoryAdjustmentDialog } from "./InventoryAdjustmentDialog"
@@ -118,6 +119,53 @@ export function ProductDetailSheet({
     } catch (err) {
       toast(
         `Print failed: ${err instanceof Error ? err.message : "Failed to open print window"}`,
+        "error"
+      )
+    }
+  }
+
+  const handlePrintPalletLabel = async (lot: any) => {
+    try {
+      // Fetch lot with receiving event info
+      const lotWithEvent = await getLotWithReceivingEvent(lot.id)
+      
+      if (!lotWithEvent) {
+        toast("Lot not found", "error")
+        return
+      }
+
+      if (!lotWithEvent.receivingEvent) {
+        toast("Receiving event information not available for this lot", "error")
+        return
+      }
+
+      // Prepare lot data for master label
+      const lotForLabel = {
+        lot_number: lotWithEvent.lot_number,
+        received_date: lotWithEvent.received_date,
+        original_quantity: lotWithEvent.quantity_received || lotWithEvent.quantity_current,
+        quantity_current: lotWithEvent.quantity_current,
+        receivingEvent: {
+          vendor: lotWithEvent.receivingEvent.vendor
+        }
+      }
+
+      const productForLabel = {
+        name: product.name,
+        unit_type: product.unit_type || "CASE",
+        gtin: product.gtin || undefined
+      }
+
+      const zpl = generateMasterLabel(lotForLabel, productForLabel)
+      
+      printZplViaBrowser(zpl, {
+        windowTitle: `Pallet Label - Lot ${lot.lot_number}`,
+      })
+
+      toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
+    } catch (err) {
+      toast(
+        `Print failed: ${err instanceof Error ? err.message : "Failed to open print window. Please allow popups."}`,
         "error"
       )
     }
@@ -243,6 +291,15 @@ export function ProductDetailSheet({
                           >
                             <Printer className="h-4 w-4 mr-2" />
                             Print Label
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePrintPalletLabel(lot)}
+                            className="flex-1"
+                          >
+                            <Package className="h-4 w-4 mr-2" />
+                            Print Pallet
                           </Button>
                           <Button
                             size="sm"

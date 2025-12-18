@@ -214,6 +214,38 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="border-y bg-muted/20">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
+          <div className="space-y-3 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Roadmap</p>
+            <h2 className="text-balance text-3xl font-semibold sm:text-4xl">What's Coming Next</h2>
+            <p className="text-lg text-muted-foreground sm:text-xl">
+              We're continuously improving PalettaHub based on feedback from warehouse teams. Here's what's on the horizon.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            {roadmapItems.map((item) => (
+              <div key={item.title} className="group relative rounded-2xl border bg-card p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-sm font-semibold text-muted-foreground">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold">{item.title}</h3>
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Upcoming</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="border-y bg-muted/40">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
           <div className="grid gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-center">

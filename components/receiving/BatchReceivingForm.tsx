@@ -500,15 +500,15 @@ export function BatchReceivingForm({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Header Section */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xl font-semibold">Received Date *</FormLabel>
+                    <FormLabel className="text-lg md:text-xl font-semibold">Received Date *</FormLabel>
                     <FormControl>
-                      <Input type="date" className="text-lg h-14" {...field} />
+                      <Input type="date" className="text-base md:text-lg h-12 md:h-14" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -520,7 +520,7 @@ export function BatchReceivingForm({
                 name="vendorId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xl font-semibold">Vendor *</FormLabel>
+                    <FormLabel className="text-lg md:text-xl font-semibold">Vendor *</FormLabel>
                     
                     {/* Smart Vendor Chips - Quick Select */}
                     {topVendors.length > 0 && (
@@ -555,7 +555,7 @@ export function BatchReceivingForm({
 
             {/* Line Items */}
             <div className="space-y-3">
-              <h3 className="text-2xl font-bold mb-4">Items</h3>
+              <h3 className="text-xl md:text-2xl font-bold mb-4">Items</h3>
 
               {fields.map((field, index) => {
                 const selectedProduct = products.find(
@@ -578,10 +578,10 @@ export function BatchReceivingForm({
 
                 return (
                   <div key={field.id} className="border-2 border-gray-300 rounded-lg p-4 bg-white">
-                    {/* Compact Row Layout */}
-                    <div className="flex gap-4 items-start">
+                    {/* Compact Row Layout - Stack on mobile, horizontal on desktop */}
+                    <div className="flex flex-col md:flex-row gap-4 items-start">
                       {/* Left 60%: Product Select */}
-                      <div className="flex-[3]">
+                      <div className="w-full md:flex-[3]">
                         <FormField
                           control={form.control}
                           name={`items.${index}.productId`}
@@ -608,18 +608,20 @@ export function BatchReceivingForm({
                       </div>
 
                       {/* Middle 20%: Unit Toggle */}
-                      <div className="flex-1">
+                      <div className="w-full md:flex-1 md:w-auto">
                         <FormField
                           control={form.control}
                           name={`items.${index}.unitType`}
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <UnitToggle
-                                  value={field.value as "CASE" | "LBS"}
-                                  onChange={(value) => field.onChange(value)}
-                                  disabled={!selectedProduct}
-                                />
+                                <div className="flex justify-center md:justify-start">
+                                  <UnitToggle
+                                    value={field.value as "CASE" | "LBS"}
+                                    onChange={(value) => field.onChange(value)}
+                                    disabled={!selectedProduct}
+                                  />
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -628,7 +630,7 @@ export function BatchReceivingForm({
                       </div>
 
                       {/* Right 20%: Quantity Input */}
-                      <div className="flex-1">
+                      <div className="w-full md:flex-1 md:w-auto">
                         <FormField
                           control={form.control}
                           name={`items.${index}.quantity`}
@@ -640,7 +642,7 @@ export function BatchReceivingForm({
                                   min={currentUnitType === "CASE" || currentUnitType === "EACH" ? "1" : "0.01"}
                                   step={currentUnitType === "LBS" ? "0.01" : "1"}
                                   placeholder="0"
-                                  className="text-3xl h-16 text-center font-bold border-2"
+                                  className="text-2xl md:text-3xl h-14 md:h-16 text-center font-bold border-2"
                                   value={field.value ?? ""}
                                   onChange={(e) => {
                                     const inputValue = e.target.value
