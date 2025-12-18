@@ -12,11 +12,11 @@ export default async function OrdersPage() {
   const orders = await getOrders()
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Orders</h1>
-        <Link href="/dashboard/orders/create">
-          <Button>
+    <div className="container mx-auto py-4 md:py-6 px-4 md:px-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">Orders</h1>
+        <Link href="/dashboard/orders/create" className="self-start sm:self-auto">
+          <Button size="sm" className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Create Order
           </Button>
@@ -58,7 +58,7 @@ export default async function OrdersPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Customer:</span>
                     <p className="font-medium">{order.customer.name}</p>
@@ -81,7 +81,7 @@ export default async function OrdersPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end gap-2">
+              <CardFooter className="flex flex-wrap justify-end gap-2 px-4 md:px-6">
                 <OrderDetailButton order={order} />
                 {order.status === "DRAFT" && (
                   <>
