@@ -49,3 +49,8 @@ EMAIL_USER="sales@srjlabs.com"
 EMAIL_PASSWORD="REPLACE_WITH_APP_PASSWORD"
 EMAIL_FROM="sales@srjlabs.com"
 
+# New Relic APM Configuration
+# Get your license key from: https://one.newrelic.com/admin-portal/api-keys/home
+NEW_RELIC_LICENSE_KEY="your_new_relic_license_key_here"
+NEW_RELIC_APP_NAME="PalettaHub WMS"
+
