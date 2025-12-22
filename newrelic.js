@@ -77,13 +77,16 @@ exports.config = {
    * Controls whether the agent should capture and report transaction traces.
    */
   transaction_tracer: {
-    enabled: true
+    enabled: true,
+    record_sql: 'obfuscated', // Hides actual data (like passwords) but shows the query structure
+    explain_threshold: 500 // 500ms
   },
   /**
    * Controls whether the agent should capture and report slow queries.
    */
   slow_sql: {
-    enabled: true
+    enabled: true,
+    max_samples: 10
   },
   /**
    * Controls whether the agent should capture and report application log events.
