@@ -51,6 +51,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 
+# Copy New Relic configuration files
+COPY --from=builder --chown=nextjs:nodejs /app/newrelic.js ./newrelic.js
+COPY --from=builder --chown=nextjs:nodejs /app/instrumentation.ts ./instrumentation.ts
+
 # Create logs directory (fallback for any libraries that might need it)
 # Must be done before switching to nextjs user
 RUN mkdir -p /app/logs && chown -R nextjs:nodejs /app/logs && chmod 755 /app/logs
