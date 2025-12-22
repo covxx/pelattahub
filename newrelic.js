@@ -19,7 +19,8 @@ exports.config = {
    * Logging configuration.
    */
   logging: {
-    level: 'info'
+    level: 'info',
+    filepath: '/tmp/newrelic_agent.log'
   },
   /**
    * This setting controls distributed tracing.
