@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition, useCallback, useRef } from "react"
-import * as XLSX from "xlsx"
+import * as XLSX from "@e965/xlsx"
 import {
   Dialog,
   DialogContent,
