@@ -30,6 +30,9 @@ services:
       QBO_REDIRECT_URI: ${QBO_REDIRECT_URI:-http://localhost:3000/api/auth/qbo/callback}
       QBO_ENVIRONMENT: ${QBO_ENVIRONMENT:-sandbox}
       NODE_ENV: production
+      # New Relic APM Configuration
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME:-WMS-Production}
     # Use production build (standalone mode) - server.js is in the built image
     networks:
       - wms-network
@@ -73,6 +76,21 @@ services:
     command: ["npm", "run", "qbo-sync"]
     networks:
       - wms-network
+
+  # New Relic Infrastructure Monitoring
+  newrelic-infra:
+    image: newrelic/infrastructure:latest
+    container_name: wms-newrelic-infra
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      NRIA_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+    # Note: Infrastructure agent runs on host network to monitor actual server stats
 
 networks:
   wms-network:

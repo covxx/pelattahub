@@ -54,3 +54,8 @@ EMAIL_FROM="sales@srjlabs.com"
 # Used to secure /api/cron/* endpoints
 CRON_SECRET="REPLACE_WITH_SECRET_TOKEN"
 
+# New Relic APM Configuration
+# Get your license key from: https://one.newrelic.com/admin-portal/api-keys/home
+NEW_RELIC_LICENSE_KEY="your_new_relic_license_key_here"
+NEW_RELIC_APP_NAME="PalettaHub WMS"
+

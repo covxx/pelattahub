@@ -25,15 +25,15 @@ export default async function DashboardLayout({
       {/* Desktop Sidebar - Hidden on mobile, visible on md and up */}
       <DashboardNav user={session.user} />
       
-      {/* Main Content Area */}
-      <div className="md:pl-64">
+      {/* Main Content Area - No left padding on mobile, padding on desktop for sidebar */}
+      <div className="w-full md:pl-64">
         {/* Desktop Header - Hidden on mobile, visible on md and up */}
         <div className="hidden md:block">
           <DashboardHeader user={session.user} />
         </div>
         
         {/* Page Content */}
-        <main className="py-4 px-4 md:py-6 md:px-6 lg:px-8">
+        <main className="w-full py-4 px-4 md:py-6 md:px-6 lg:px-8">
           {children}
         </main>
       </div>
