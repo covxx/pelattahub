@@ -10,11 +10,17 @@ exports.config = {
   /**
    * Array of application names.
    */
-  app_name: [process.env.NEW_RELIC_APP_NAME || 'PalettaHub WMS'],
+  app_name: [process.env.NEW_RELIC_APP_NAME || 'WMS-Production'],
   /**
    * Your New Relic license key.
    */
   license_key: process.env.NEW_RELIC_LICENSE_KEY || '',
+  /**
+   * Logging configuration.
+   */
+  logging: {
+    level: 'info'
+  },
   /**
    * This setting controls distributed tracing.
    * Distributed tracing lets you see the path that a request takes through your
