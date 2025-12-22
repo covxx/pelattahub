@@ -65,6 +65,13 @@ fi
 echo "✅ Image transferred successfully!"
 
 # =============================================================================
+# PULL LATEST CODE ON REMOTE SERVER
+# =============================================================================
+echo "📥 Pulling latest code on remote server..."
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && git pull origin dev || echo '⚠️  Git pull failed or not a git repo - continuing anyway'"
+echo "✅ Code updated (if applicable)"
+
+# =============================================================================
 # RESTART REMOTE SERVICES
 # =============================================================================
 echo "🛡️ Enabling maintenance mode on remote server..."

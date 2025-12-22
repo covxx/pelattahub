@@ -146,7 +146,17 @@ echo "   Created: $IMAGE_CREATED"
 echo ""
 
 # =============================================================================
-# 2. Stop Current Services
+# 2. Pull Latest Code (if git repo)
+# =============================================================================
+if [ -d ".git" ]; then
+  echo -e "${YELLOW}📥 Pulling latest code...${NC}"
+  git pull origin dev || echo -e "${YELLOW}⚠️  Git pull failed - continuing anyway${NC}"
+  echo -e "${GREEN}✅ Code updated${NC}"
+  echo ""
+fi
+
+# =============================================================================
+# 3. Stop Current Services
 # =============================================================================
 echo -e "${YELLOW}🛑 Stopping current services...${NC}"
 docker compose down
@@ -155,7 +165,7 @@ echo -e "${GREEN}✅ Services stopped${NC}"
 echo ""
 
 # =============================================================================
-# 3. Ensure Latest Image Will Be Used
+# 4. Ensure Latest Image Will Be Used
 # =============================================================================
 echo -e "${YELLOW}⚙️  Preparing to use latest image...${NC}"
 
@@ -183,7 +193,7 @@ fi
 echo ""
 
 # =============================================================================
-# 4. Start Services with Latest Image
+# 5. Start Services with Latest Image
 # =============================================================================
 echo -e "${YELLOW}🚀 Starting services with latest image...${NC}"
 
@@ -209,7 +219,7 @@ echo ""
 sleep 3
 
 # =============================================================================
-# 5. Check Service Status
+# 6. Check Service Status
 # =============================================================================
 echo -e "${YELLOW}📊 Checking service status...${NC}"
 docker compose ps
@@ -245,7 +255,7 @@ echo -e "${GREEN}✅ Services are running${NC}"
 echo ""
 
 # =============================================================================
-# 6. Run Database Migrations
+# 7. Run Database Migrations
 # =============================================================================
 echo -e "${YELLOW}🗄️  Running database migrations...${NC}"
 # Use the Prisma version from package.json (6.19.0)
@@ -260,7 +270,7 @@ fi
 echo ""
 
 # =============================================================================
-# 7. Verify Health Endpoint
+# 8. Verify Health Endpoint
 # =============================================================================
 echo -e "${YELLOW}🏥 Checking health endpoint...${NC}"
 HEALTH_RESPONSE=$(curl -s -w "\n%{http_code}" "$HEALTH_URL" || echo -e "\n000")
@@ -291,14 +301,14 @@ fi
 echo ""
 
 # =============================================================================
-# 8. Show Recent Logs
+# 9. Show Recent Logs
 # =============================================================================
 echo -e "${YELLOW}📋 Recent application logs (last 20 lines):${NC}"
 docker compose logs --tail=20 app
 echo ""
 
 # =============================================================================
-# 9. Check for Errors in Logs
+# 10. Check for Errors in Logs
 # =============================================================================
 echo -e "${YELLOW}🔍 Checking for errors in logs...${NC}"
 ERROR_COUNT=$(docker compose logs app 2>&1 | grep -i "error\|fatal\|exception" | tail -5 | wc -l)
@@ -313,7 +323,7 @@ fi
 echo ""
 
 # =============================================================================
-# 10. Verify Image Version
+# 11. Verify Image Version
 # =============================================================================
 echo -e "${YELLOW}🔍 Verifying running container uses latest image...${NC}"
 
@@ -353,7 +363,7 @@ fi
 echo ""
 
 # =============================================================================
-# 11. Clean up temporary files
+# 12. Clean up temporary files
 # =============================================================================
 if [ "$USE_OVERRIDE" = true ]; then
   echo -e "${YELLOW}🧹 Cleaning up temporary override file...${NC}"
@@ -363,17 +373,17 @@ if [ "$USE_OVERRIDE" = true ]; then
 fi
 
 # =============================================================================
-# 12. Remove old images (keep two most recent)
+# 13. Remove old images (keep two most recent)
 # =============================================================================
 cleanup_old_images
 
 # =============================================================================
-# 13. Ensure maintenance flag is cleared
+# 14. Ensure maintenance flag is cleared
 # =============================================================================
 ensure_maintenance_off
 
 # =============================================================================
-# 14. Summary
+# 15. Summary
 # =============================================================================
 echo -e "${BLUE}========================================${NC}"
 echo -e "${GREEN}✅ Post-Deployment Verification Complete${NC}"
