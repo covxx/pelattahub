@@ -35,73 +35,76 @@ interface CaseLabelData {
 }
 
 const styles = StyleSheet.create({
-  companyHeader: {
-    fontSize: 10,
-    textAlign: 'center',
-    marginBottom: 4,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  productName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-    color: '#000',
-    textTransform: 'uppercase',
+  container: {
+    backgroundColor: '#000',
+    padding: 6,
+    height: '100%',
+    justifyContent: 'space-between',
   },
   contentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    marginBottom: 6,
   },
   leftColumn: {
     flex: 1,
-    fontSize: 10,
-    color: '#333',
+    paddingLeft: 4,
   },
-  rightColumn: {
-    width: 80,
-    alignItems: 'flex-end',
-  },
-  voicePickBox: {
-    backgroundColor: '#000',
+  leftText: {
+    fontSize: 11,
     color: '#fff',
-    padding: 8,
-    borderRadius: 4,
-    width: 70,
-    alignItems: 'center',
-  },
-  voicePickSmall: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 2,
-  },
-  voicePickLarge: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
+    marginBottom: 5,
+    fontFamily: 'Helvetica',
   },
   label: {
     fontWeight: 'bold',
     marginRight: 4,
   },
-  barcodeContainer: {
-    marginTop: 8,
+  rightColumn: {
+    width: 90,
+    alignItems: 'flex-end',
+    paddingRight: 4,
+  },
+  voicePickBox: {
+    backgroundColor: '#000',
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderStyle: 'solid',
+    padding: 6,
+    width: 80,
     alignItems: 'center',
-    paddingTop: 4,
+    justifyContent: 'center',
+  },
+  voicePickSmall: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 3,
+    fontFamily: 'Helvetica-Bold',
+  },
+  voicePickLarge: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#fff',
+    fontFamily: 'Helvetica-Bold',
+    lineHeight: 1,
+  },
+  barcodeContainer: {
+    alignItems: 'center',
+    marginTop: 4,
+    paddingHorizontal: 4,
   },
   barcodeImage: {
-    width: 180,
-    height: 50,
-    marginBottom: 4,
+    width: 200,
+    height: 45,
+    marginBottom: 3,
   },
   barcodeText: {
-    fontSize: 8,
+    fontSize: 7,
     textAlign: 'center',
-    color: '#333',
+    color: '#fff',
+    fontFamily: 'Helvetica',
   },
 })
 
@@ -134,30 +137,26 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
   return (
     <Document>
       <BaseLabel width={4} height={2}>
-        <View style={{ padding: 4 }}>
-          {/* Zone A: Company name */}
-          <Text style={styles.companyHeader}>{companyName}</Text>
-          
-          {/* Zone B: Product name */}
-          <Text style={styles.productName}>{productName}</Text>
-          
-          {/* Zone C & D: Left data and Right Voice Pick box */}
+        <View style={styles.container}>
+          {/* Top Row: Left data and Right Voice Pick box */}
           <View style={styles.contentRow}>
+            {/* Left Column: GTIN, LOT, PACK */}
             <View style={styles.leftColumn}>
-              <Text style={{ fontSize: 9 }}>
+              <Text style={styles.leftText}>
                 <Text style={styles.label}>GTIN:</Text>
                 {gtin}
               </Text>
-              <Text style={{ fontSize: 9, marginTop: 2 }}>
+              <Text style={styles.leftText}>
                 <Text style={styles.label}>LOT:</Text>
                 {lotNumber}
               </Text>
-              <Text style={{ fontSize: 9, marginTop: 2 }}>
+              <Text style={styles.leftText}>
                 <Text style={styles.label}>PACK:</Text>
                 {packDateDisplay}
               </Text>
             </View>
             
+            {/* Right Column: Voice Pick box */}
             <View style={styles.rightColumn}>
               <View style={styles.voicePickBox}>
                 <Text style={styles.voicePickSmall}>{small}</Text>
@@ -166,7 +165,7 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
             </View>
           </View>
           
-          {/* Zone E: Bottom GS1-128 barcode */}
+          {/* Bottom: GS1-128 barcode */}
           <View style={styles.barcodeContainer}>
             {barcodeImageUrl ? (
               <>
