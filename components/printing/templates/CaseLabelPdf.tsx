@@ -9,8 +9,8 @@ import { getVoicePickCode, formatDateForVoicePick, formatVoicePick } from '@/lib
  * Case Label PDF Template
  * 
  * 4x2 inch label with horizontal layout
- * Top Section: Two columns (left: info, right: voice pick)
- * Bottom Section: Full-width centered barcode
+ * Top Section: Company info, product description, lot code
+ * Bottom Section: Voice pick code and barcode (centered)
  */
 
 interface CaseLabelData {
@@ -40,19 +40,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topSection: {
-    flexDirection: 'row',
     flex: 1,
   },
   leftColumn: {
-    width: '60%',
-    paddingRight: 6,
+    width: '100%',
     justifyContent: 'flex-start',
-  },
-  rightColumn: {
-    width: '40%',
-    paddingLeft: 4,
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
   },
   companyName: {
     fontSize: 8,
@@ -75,12 +67,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontFamily: 'Helvetica-Bold',
   },
-  skuText: {
-    fontSize: 9,
-    color: '#000',
-    marginBottom: 2,
-    fontFamily: 'Helvetica',
-  },
   lotText: {
     fontSize: 9,
     color: '#000',
@@ -93,11 +79,12 @@ const styles = StyleSheet.create({
   voicePickContainer: {
     backgroundColor: '#000',
     padding: 4,
-    marginBottom: 4,
+    marginBottom: 3,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 60,
     minHeight: 50,
+    alignSelf: 'center',
   },
   voicePickSmall: {
     fontSize: 12,
@@ -120,8 +107,8 @@ const styles = StyleSheet.create({
   },
   barcodeImage: {
     width: '100%',
-    maxWidth: 250,
-    height: 40,
+    maxWidth: 180,
+    height: 30,
     marginBottom: 2,
   },
   barcodeText: {
@@ -138,7 +125,6 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
   
   const lotNumber = lot.lot_number
   const itemDescription = product.name.toUpperCase()
-  const sku = product.sku || product.gtin || ''
   const gtin = padGTIN(product.gtin)
   const receivedDate = new Date(lot.received_date)
 
@@ -158,39 +144,30 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
     <Document>
       <BaseLabel width={4} height={2}>
         <View style={styles.container}>
-          {/* Top Section: Two columns */}
+          {/* Top Section: Company info and product details */}
           <View style={styles.topSection}>
-            {/* Left Column: Human-readable information */}
             <View style={styles.leftColumn}>
               <Text style={styles.companyName}>{companyName}</Text>
               {companyAddress && (
                 <Text style={styles.companyAddress}>{companyAddress}</Text>
               )}
               <Text style={styles.itemDescription}>{itemDescription}</Text>
-              {sku && (
-                <Text style={styles.skuText}>
-                  <Text style={styles.label}>SKU:</Text>
-                  {sku}
-                </Text>
-              )}
               <Text style={styles.lotText}>
                 <Text style={styles.label}>LOT:</Text>
                 {lotNumber}
               </Text>
             </View>
-
-            {/* Right Column: Voice Pick box */}
-            <View style={styles.rightColumn}>
-              {/* Voice Pick Code Box - Inverted (black bg, white text) */}
-              <View style={styles.voicePickContainer}>
-                <Text style={styles.voicePickSmall}>{small}</Text>
-                <Text style={styles.voicePickLarge}>{large}</Text>
-              </View>
-            </View>
           </View>
 
-          {/* Bottom Section: Full-width centered barcode */}
+          {/* Bottom Section: Voice pick code and barcode (centered) */}
           <View style={styles.barcodeWrapper}>
+            {/* Voice Pick Code Box - Inverted (black bg, white text) */}
+            <View style={styles.voicePickContainer}>
+              <Text style={styles.voicePickSmall}>{small}</Text>
+              <Text style={styles.voicePickLarge}>{large}</Text>
+            </View>
+            
+            {/* Barcode */}
             {barcodeImageUrl ? (
               <>
                 <Image src={barcodeImageUrl} style={styles.barcodeImage} />
