@@ -8,13 +8,9 @@ import { getVoicePickCode, formatDateForVoicePick, formatVoicePick } from '@/lib
 /**
  * Case Label PDF Template
  * 
- * 4x2 inch label optimized for horizontal density (PTI-compliant)
- * Layout (PTI Standard):
- * - Zone A: Company name (top header, centered)
- * - Zone B: Product description (large, bold, centered)
- * - Zone C: Left data (GTIN, LOT, PACK date)
- * - Zone D: Right Voice Pick box (split 2+2 digits, inverted)
- * - Zone E: Bottom GS1-128 barcode (full width)
+ * 4x2 inch label with horizontal two-column layout
+ * Left Column (60%): Company info, product description, SKU, lot code
+ * Right Column (40%): Voice Pick box (top), barcode (bottom)
  */
 
 interface CaseLabelData {
@@ -26,6 +22,7 @@ interface CaseLabelData {
   product: {
     name: string
     gtin: string
+    sku?: string
     variety?: string | null
   }
   companySettings?: {
@@ -37,88 +34,85 @@ interface CaseLabelData {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
-    padding: 6,
+    padding: 4,
     height: '100%',
-    justifyContent: 'space-between',
-  },
-  companyHeader: {
-    fontSize: 9,
-    textAlign: 'left',
-    color: '#000',
-    marginBottom: 4,
-    fontFamily: 'Helvetica-Bold',
-    paddingLeft: 4,
-  },
-  productName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'left',
-    color: '#000',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    fontFamily: 'Helvetica-Bold',
-    paddingLeft: 4,
-  },
-  contentRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
   },
   leftColumn: {
-    flex: 1,
+    width: '60%',
+    paddingRight: 6,
+    justifyContent: 'flex-start',
+  },
+  rightColumn: {
+    width: '40%',
     paddingLeft: 4,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  companyName: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 2,
+    fontFamily: 'Helvetica-Bold',
+  },
+  companyAddress: {
+    fontSize: 7,
+    color: '#000',
+    marginBottom: 4,
+    fontFamily: 'Helvetica',
+  },
+  itemDescription: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 3,
+    textTransform: 'uppercase',
+    fontFamily: 'Helvetica-Bold',
+  },
+  skuText: {
+    fontSize: 9,
+    color: '#000',
+    marginBottom: 2,
+    fontFamily: 'Helvetica',
   },
   lotText: {
-    fontSize: 11,
+    fontSize: 9,
     color: '#000',
     fontFamily: 'Helvetica',
   },
   label: {
     fontWeight: 'bold',
-    marginRight: 4,
+    marginRight: 3,
   },
-  rightColumn: {
-    width: 90,
-    alignItems: 'flex-end',
-    paddingRight: 4,
-  },
-  voicePickBox: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#000',
-    borderStyle: 'solid',
-    padding: 6,
-    width: 80,
+  voicePickContainer: {
+    backgroundColor: '#000',
+    padding: 4,
+    marginBottom: 4,
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 60,
+    minHeight: 50,
   },
-  voicePickSmall: {
-    fontSize: 14,
+  voicePickCode: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 3,
+    color: '#fff',
     fontFamily: 'Helvetica-Bold',
+    textAlign: 'center',
   },
-  voicePickLarge: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#000',
-    fontFamily: 'Helvetica-Bold',
-    lineHeight: 1,
-  },
-  barcodeContainer: {
+  barcodeWrapper: {
     alignItems: 'center',
-    marginTop: 4,
-    paddingHorizontal: 4,
+    width: '100%',
   },
   barcodeImage: {
-    width: 200,
-    height: 45,
-    marginBottom: 3,
+    width: '100%',
+    maxWidth: 110,
+    height: 35,
+    marginBottom: 2,
   },
   barcodeText: {
-    fontSize: 7,
+    fontSize: 6,
     textAlign: 'center',
     color: '#000',
     fontFamily: 'Helvetica',
@@ -127,25 +121,22 @@ const styles = StyleSheet.create({
 
 export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
   const companyName = companySettings?.name || process.env.NEXT_PUBLIC_COMPANY_NAME || 'Fresh Produce Co.'
+  const companyAddress = companySettings?.address || process.env.NEXT_PUBLIC_COMPANY_ADDRESS || ''
   
   const lotNumber = lot.lot_number
-  const productName = product.name.toUpperCase() // PTI standard: all caps
+  const itemDescription = product.name.toUpperCase()
+  const sku = product.sku || product.gtin || ''
   const gtin = padGTIN(product.gtin)
   const receivedDate = new Date(lot.received_date)
-  const packDateDisplay = format(receivedDate, 'MM/dd/yy') // MM/DD/YY format
 
   // Calculate Voice Pick check digit
   const voicePickDateStr = formatDateForVoicePick(receivedDate)
   const voicePickCode = getVoicePickCode(gtin, lotNumber, voicePickDateStr)
-  const { small, large } = formatVoicePick(voicePickCode)
+  // Display full 4-digit code in voice pick box
+  const voicePickDisplay = voicePickCode
 
   // Construct GS1-128 barcode data
-  // Format: (01){gtin}(13){packDate}(10){lotNumber}
-  // AI 13 = Pack Date (YYMMDD)
-  const packDateBarcode = format(receivedDate, 'yyMMdd')
   const barcodeData = formatGS1Barcode(gtin, lotNumber)
-  // For full PTI compliance, we'd include pack date: (01){gtin}(13){packDate}(10){lot}
-  // But for simplicity, we'll use (01){gtin}(10){lot}
   const barcodeHRI = `(01) ${gtin} (10) ${lotNumber}`
 
   // Generate barcode image
@@ -155,41 +146,43 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
     <Document>
       <BaseLabel width={4} height={2}>
         <View style={styles.container}>
-          {/* Company name header */}
-          <Text style={styles.companyHeader}>{companyName}</Text>
-          
-          {/* Product name */}
-          <Text style={styles.productName}>{productName}</Text>
-          
-          {/* Middle Row: LOT and Voice Pick box */}
-          <View style={styles.contentRow}>
-            {/* Left Column: LOT only */}
-            <View style={styles.leftColumn}>
-              <Text style={styles.lotText}>
-                <Text style={styles.label}>LOT:</Text>
-                {lotNumber}
-              </Text>
-            </View>
-            
-            {/* Right Column: Voice Pick box */}
-            <View style={styles.rightColumn}>
-              <View style={styles.voicePickBox}>
-                <Text style={styles.voicePickSmall}>{small}</Text>
-                <Text style={styles.voicePickLarge}>{large}</Text>
-              </View>
-            </View>
-          </View>
-          
-          {/* Bottom: GS1-128 barcode (includes GTIN and LOT in HRI) */}
-          <View style={styles.barcodeContainer}>
-            {barcodeImageUrl ? (
-              <>
-                <Image src={barcodeImageUrl} style={styles.barcodeImage} />
-                <Text style={styles.barcodeText}>{barcodeHRI}</Text>
-              </>
-            ) : (
-              <Text style={styles.barcodeText}>{barcodeHRI}</Text>
+          {/* Left Column: Human-readable information */}
+          <View style={styles.leftColumn}>
+            <Text style={styles.companyName}>{companyName}</Text>
+            {companyAddress && (
+              <Text style={styles.companyAddress}>{companyAddress}</Text>
             )}
+            <Text style={styles.itemDescription}>{itemDescription}</Text>
+            {sku && (
+              <Text style={styles.skuText}>
+                <Text style={styles.label}>SKU:</Text>
+                {sku}
+              </Text>
+            )}
+            <Text style={styles.lotText}>
+              <Text style={styles.label}>LOT:</Text>
+              {lotNumber}
+            </Text>
+          </View>
+
+          {/* Right Column: Voice Pick box and Barcode */}
+          <View style={styles.rightColumn}>
+            {/* Voice Pick Code Box - Inverted (black bg, white text) */}
+            <View style={styles.voicePickContainer}>
+              <Text style={styles.voicePickCode}>{voicePickDisplay}</Text>
+            </View>
+
+            {/* Barcode */}
+            <View style={styles.barcodeWrapper}>
+              {barcodeImageUrl ? (
+                <>
+                  <Image src={barcodeImageUrl} style={styles.barcodeImage} />
+                  <Text style={styles.barcodeText}>{barcodeHRI}</Text>
+                </>
+              ) : (
+                <Text style={styles.barcodeText}>{barcodeHRI}</Text>
+              )}
+            </View>
           </View>
         </View>
       </BaseLabel>
