@@ -19,9 +19,10 @@ import {
 
 interface AdminSidebarProps {
   isAdmin: boolean
+  isManager: boolean
 }
 
-export function AdminSidebar({ isAdmin }: AdminSidebarProps) {
+export function AdminSidebar({ isAdmin, isManager }: AdminSidebarProps) {
   const pathname = usePathname()
 
   // Navigation items grouped by category
@@ -34,14 +35,19 @@ export function AdminSidebar({ isAdmin }: AdminSidebarProps) {
 
   const systemItems = [
     { href: "/dashboard/admin/traceability", label: "Traceability", icon: Search },
-    { href: "/dashboard/admin/health", label: "System Health", icon: Activity },
     { href: "/dashboard/admin/integrations/qbo", label: "QuickBooks Sync", icon: Link2 },
     { href: "/dashboard/admin/settings", label: "Settings", icon: Settings },
   ]
 
+  // Management tools (Admin and Manager)
+  const managementItems = (isAdmin || isManager) ? [
+    { href: "/dashboard/admin/recall", label: "Recall", icon: AlertTriangle },
+  ] : []
+
+  // Admin only items
   const adminOnlyItems = isAdmin ? [
     { href: "/dashboard/admin/logs", label: "System Logs", icon: FileText },
-    { href: "/dashboard/admin/recall", label: "Recall", icon: AlertTriangle },
+    { href: "/dashboard/admin/health", label: "System Health", icon: Activity },
   ] : []
 
   return (
@@ -94,6 +100,23 @@ export function AdminSidebar({ isAdmin }: AdminSidebarProps) {
               ))}
             </div>
           </div>
+
+          {/* Management Tools */}
+          {managementItems.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                Management
+              </p>
+              <div className="space-y-1">
+                {managementItems.map((item) => (
+                  <AdminNavLink key={item.href} href={item.href} pathname={pathname}>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </AdminNavLink>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Admin Only */}
           {adminOnlyItems.length > 0 && (

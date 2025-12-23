@@ -19,11 +19,12 @@ export default async function AdminLayout({
   }
 
   const isAdmin = session.user.role === "ADMIN"
+  const isManager = session.user.role === "MANAGER"
 
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       {/* Sidebar Navigation */}
-      <AdminSidebar isAdmin={isAdmin} />
+      <AdminSidebar isAdmin={isAdmin} isManager={isManager} />
 
       {/* Main Content */}
       <main className="flex-1 min-w-0">

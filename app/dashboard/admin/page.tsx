@@ -16,6 +16,7 @@ export default async function AdminDashboardPage() {
   const session = await auth()
   const stats = await getAdminStats()
   const isAdmin = session?.user?.role === "ADMIN"
+  const isManager = session?.user?.role === "MANAGER"
 
   // Navigation cards grouped by category
   const dataManagementCards = [
@@ -61,12 +62,6 @@ export default async function AdminDashboardPage() {
       icon: Search,
     },
     {
-      href: "/dashboard/admin/health",
-      title: "System Health",
-      description: "Monitor system performance and status",
-      icon: Activity,
-    },
-    {
       href: "/dashboard/admin/integrations/qbo",
       title: "QuickBooks Sync",
       description: "Configure QuickBooks Online integration",
@@ -80,6 +75,17 @@ export default async function AdminDashboardPage() {
     },
   ]
 
+  // Management tools (Admin and Manager)
+  const managementCards = (isAdmin || isManager) ? [
+    {
+      href: "/dashboard/admin/recall",
+      title: "Recall Management",
+      description: "Manage product recalls and safety alerts",
+      icon: AlertTriangle,
+    },
+  ] : []
+
+  // Admin only cards
   const adminOnlyCards = isAdmin ? [
     {
       href: "/dashboard/admin/logs",
@@ -88,10 +94,10 @@ export default async function AdminDashboardPage() {
       icon: FileText,
     },
     {
-      href: "/dashboard/admin/recall",
-      title: "Recall Management",
-      description: "Manage product recalls and safety alerts",
-      icon: AlertTriangle,
+      href: "/dashboard/admin/health",
+      title: "System Health",
+      description: "Monitor system performance and status",
+      icon: Activity,
     },
   ] : []
 
@@ -229,6 +235,33 @@ export default async function AdminDashboardPage() {
           })}
         </div>
       </div>
+
+      {/* Management Section */}
+      {managementCards.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Management Tools</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {managementCards.map((card) => {
+              const Icon = card.icon
+              return (
+                <Link key={card.href} href={card.href}>
+                  <Card className="h-full hover:shadow-md transition-shadow cursor-pointer group border-orange-200 dark:border-orange-900">
+                    <CardHeader>
+                      <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/20 group-hover:bg-orange-200 dark:group-hover:bg-orange-900/30 transition-colors w-fit">
+                        <Icon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <CardTitle className="mt-4">{card.title}</CardTitle>
+                      <CardDescription className="text-xs">
+                        {card.description}
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Admin Only Section */}
       {adminOnlyCards.length > 0 && (
