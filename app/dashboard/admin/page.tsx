@@ -1,7 +1,8 @@
 import { getAdminStats } from "@/app/actions/admin"
 import { auth } from "@/lib/auth"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Package, Truck, Users, Building2, LayoutDashboard } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Package, Truck, Users, Building2, LayoutDashboard, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { 
   FileText, 
@@ -105,6 +106,12 @@ export default async function AdminDashboardPage() {
     <div className="space-y-8">
       {/* Page Header */}
       <div>
+        <Link href="/dashboard">
+          <Button variant="ghost" size="sm" className="mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </Link>
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-muted-foreground mt-2">
           System overview and quick access to administration tools
