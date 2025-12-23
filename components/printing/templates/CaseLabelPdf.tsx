@@ -94,12 +94,19 @@ const styles = StyleSheet.create({
     minWidth: 60,
     minHeight: 50,
   },
-  voicePickCode: {
-    fontSize: 20,
+  voicePickSmall: {
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#fff',
     fontFamily: 'Helvetica-Bold',
-    textAlign: 'center',
+    marginBottom: 2,
+  },
+  voicePickLarge: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    fontFamily: 'Helvetica-Bold',
+    lineHeight: 1,
   },
   barcodeWrapper: {
     alignItems: 'center',
@@ -132,8 +139,7 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
   // Calculate Voice Pick check digit
   const voicePickDateStr = formatDateForVoicePick(receivedDate)
   const voicePickCode = getVoicePickCode(gtin, lotNumber, voicePickDateStr)
-  // Display full 4-digit code in voice pick box
-  const voicePickDisplay = voicePickCode
+  const { small, large } = formatVoicePick(voicePickCode)
 
   // Construct GS1-128 barcode data
   const barcodeData = formatGS1Barcode(gtin, lotNumber)
@@ -169,7 +175,8 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
           <View style={styles.rightColumn}>
             {/* Voice Pick Code Box - Inverted (black bg, white text) */}
             <View style={styles.voicePickContainer}>
-              <Text style={styles.voicePickCode}>{voicePickDisplay}</Text>
+              <Text style={styles.voicePickSmall}>{small}</Text>
+              <Text style={styles.voicePickLarge}>{large}</Text>
             </View>
 
             {/* Barcode */}
