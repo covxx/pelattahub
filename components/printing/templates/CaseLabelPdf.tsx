@@ -41,6 +41,22 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'space-between',
   },
+  companyHeader: {
+    fontSize: 9,
+    textAlign: 'center',
+    color: '#fff',
+    marginBottom: 4,
+    fontFamily: 'Helvetica-Bold',
+  },
+  productName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#fff',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    fontFamily: 'Helvetica-Bold',
+  },
   contentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -51,10 +67,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingLeft: 4,
   },
-  leftText: {
+  lotText: {
     fontSize: 11,
     color: '#fff',
-    marginBottom: 5,
     fontFamily: 'Helvetica',
   },
   label: {
@@ -138,21 +153,19 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
     <Document>
       <BaseLabel width={4} height={2}>
         <View style={styles.container}>
-          {/* Top Row: Left data and Right Voice Pick box */}
+          {/* Company name header */}
+          <Text style={styles.companyHeader}>{companyName}</Text>
+          
+          {/* Product name */}
+          <Text style={styles.productName}>{productName}</Text>
+          
+          {/* Middle Row: LOT and Voice Pick box */}
           <View style={styles.contentRow}>
-            {/* Left Column: GTIN, LOT, PACK */}
+            {/* Left Column: LOT only */}
             <View style={styles.leftColumn}>
-              <Text style={styles.leftText}>
-                <Text style={styles.label}>GTIN:</Text>
-                {gtin}
-              </Text>
-              <Text style={styles.leftText}>
+              <Text style={styles.lotText}>
                 <Text style={styles.label}>LOT:</Text>
                 {lotNumber}
-              </Text>
-              <Text style={styles.leftText}>
-                <Text style={styles.label}>PACK:</Text>
-                {packDateDisplay}
               </Text>
             </View>
             
@@ -165,7 +178,7 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
             </View>
           </View>
           
-          {/* Bottom: GS1-128 barcode */}
+          {/* Bottom: GS1-128 barcode (includes GTIN and LOT in HRI) */}
           <View style={styles.barcodeContainer}>
             {barcodeImageUrl ? (
               <>
