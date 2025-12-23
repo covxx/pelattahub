@@ -3,6 +3,7 @@
 import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signOut } from "next-auth/react"
+import { ThemeToggle } from "@/components/theme/ThemeToggle"
 
 interface DashboardHeaderProps {
   user: {
@@ -24,6 +25,9 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
         </div>
         
         <div className="flex items-center gap-x-4 lg:gap-x-6">
+          {/* Theme toggle */}
+          <ThemeToggle />
+          
           {/* User info - hidden on mobile, shown in sidebar */}
           <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200 dark:lg:bg-gray-700" aria-hidden="true" />
           

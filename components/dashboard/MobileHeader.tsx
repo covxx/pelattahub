@@ -24,6 +24,7 @@ import {
   Link2,
   Activity,
 } from "lucide-react"
+import { ThemeToggle } from "@/components/theme/ThemeToggle"
 
 interface MobileHeaderProps {
   user: {
@@ -138,7 +139,7 @@ export function MobileHeader({ user }: MobileHeaderProps) {
   })
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 shadow-sm">
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 shadow-sm">
       {/* Logo */}
       <Link href="/dashboard" className="flex items-center">
         <BoxIcon className="h-8 w-8 text-blue-600" />
@@ -147,8 +148,12 @@ export function MobileHeader({ user }: MobileHeaderProps) {
         </span>
       </Link>
 
-      {/* Hamburger Menu */}
-      <Sheet open={open} onOpenChange={setOpen}>
+      {/* Right side: Theme toggle and menu */}
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        
+        {/* Hamburger Menu */}
+        <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <button
             type="button"
@@ -268,7 +273,8 @@ export function MobileHeader({ user }: MobileHeaderProps) {
             </nav>
           </div>
         </SheetContent>
-      </Sheet>
-    </header>
+        </Sheet>
+      </div>
+      </header>
   )
 }
