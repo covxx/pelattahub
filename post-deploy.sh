@@ -88,6 +88,28 @@ cleanup_old_images() {
   echo -e "${GREEN}✅ Old images cleaned up${NC}"
 }
 
+cleanup_docker_resources() {
+  echo -e "${YELLOW}🧹 Cleaning up Docker resources (images and build cache)...${NC}"
+  
+  # Show disk usage before cleanup
+  echo -e "${BLUE}📊 Docker disk usage before cleanup:${NC}"
+  docker system df
+  
+  # Remove all unused images (dangling and untagged)
+  echo -e "${YELLOW}   Removing unused images...${NC}"
+  docker image prune -f
+  
+  # Remove build cache older than 24 hours
+  echo -e "${YELLOW}   Removing build cache older than 24 hours...${NC}"
+  docker builder prune -af --filter "until=24h"
+  
+  # Show disk usage after cleanup
+  echo -e "${BLUE}📊 Docker disk usage after cleanup:${NC}"
+  docker system df
+  
+  echo -e "${GREEN}✅ Docker cleanup complete${NC}"
+}
+
 ensure_maintenance_off() {
   if ! maintenance_exists; then
     echo -e "${GREEN}✅ Maintenance flag not present${NC}"
@@ -376,6 +398,11 @@ fi
 # 13. Remove old images (keep two most recent)
 # =============================================================================
 cleanup_old_images
+
+# =============================================================================
+# 13b. Clean up Docker resources (unused images and build cache)
+# =============================================================================
+cleanup_docker_resources
 
 # =============================================================================
 # 14. Ensure maintenance flag is cleared
