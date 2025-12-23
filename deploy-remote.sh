@@ -97,17 +97,32 @@ echo ""
 echo "📊 Checking service status..."
 ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose ps"
 
+# =============================================================================
+# CLEANUP DOCKER RESOURCES
+# =============================================================================
 echo ""
+echo "🧹 Cleaning up Docker resources on remote server..."
+echo "   Removing unused images and build cache older than 24h..."
+
+# Clean up unused images and build cache
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "docker image prune -f && docker builder prune -af --filter 'until=24h'" || echo "⚠️  Cleanup had some issues (non-critical)"
+
+echo "✅ Cleanup complete"
+echo ""
+
 echo "📋 Next steps on production server:"
-echo "   1. Run database migrations (if schema changed):"
+echo "   1. Run post-deploy verification (recommended):"
+echo "      ssh ${SSH_USER}@${SERVER_IP} 'cd ${REMOTE_DIR} && ./post-deploy.sh'"
+echo ""
+echo "   2. Or manually run database migrations (if schema changed):"
 echo "      ssh ${SSH_USER}@${SERVER_IP} 'cd ${REMOTE_DIR} && docker compose exec app npx prisma migrate deploy'"
 echo ""
-echo "   2. Check application logs:"
+echo "   3. Check application logs:"
 echo "      ssh ${SSH_USER}@${SERVER_IP} 'cd ${REMOTE_DIR} && docker compose logs -f app'"
 echo ""
-echo "   3. Verify health endpoint:"
+echo "   4. Verify health endpoint:"
 echo "      curl http://${SERVER_IP}:3000/api/health"
 echo ""
-echo "   4. Check service status:"
+echo "   5. Check service status:"
 echo "      ssh ${SSH_USER}@${SERVER_IP} 'cd ${REMOTE_DIR} && docker compose ps'"
 
