@@ -88,7 +88,8 @@ export function usePrintLabel(type: 'pallet' | 'case') {
         }
 
         // Generate PDF blob
-        const blob = await pdf(labelDocument).toBlob()
+        // Type assertion needed because React.createElement returns generic ReactElement
+        const blob = await pdf(labelDocument as any).toBlob()
         const blobUrl = URL.createObjectURL(blob)
 
         // Open in browser's native PDF viewer
