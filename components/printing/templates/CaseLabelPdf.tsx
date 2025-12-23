@@ -8,9 +8,9 @@ import { getVoicePickCode, formatDateForVoicePick, formatVoicePick } from '@/lib
 /**
  * Case Label PDF Template
  * 
- * 4x2 inch label with horizontal two-column layout
- * Left Column (60%): Company info, product description, SKU, lot code
- * Right Column (40%): Voice Pick box (top), barcode (bottom)
+ * 4x2 inch label with horizontal layout
+ * Top Section: Two columns (left: info, right: voice pick)
+ * Bottom Section: Full-width centered barcode
  */
 
 interface CaseLabelData {
@@ -36,7 +36,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 4,
     height: '100%',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
+  topSection: {
     flexDirection: 'row',
+    flex: 1,
   },
   leftColumn: {
     width: '60%',
@@ -46,7 +51,7 @@ const styles = StyleSheet.create({
   rightColumn: {
     width: '40%',
     paddingLeft: 4,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'flex-end',
   },
   companyName: {
@@ -111,11 +116,12 @@ const styles = StyleSheet.create({
   barcodeWrapper: {
     alignItems: 'center',
     width: '100%',
+    marginTop: 4,
   },
   barcodeImage: {
     width: '100%',
-    maxWidth: 110,
-    height: 35,
+    maxWidth: 250,
+    height: 40,
     marginBottom: 2,
   },
   barcodeText: {
@@ -152,44 +158,47 @@ export function CaseLabelPdf({ lot, product, companySettings }: CaseLabelData) {
     <Document>
       <BaseLabel width={4} height={2}>
         <View style={styles.container}>
-          {/* Left Column: Human-readable information */}
-          <View style={styles.leftColumn}>
-            <Text style={styles.companyName}>{companyName}</Text>
-            {companyAddress && (
-              <Text style={styles.companyAddress}>{companyAddress}</Text>
-            )}
-            <Text style={styles.itemDescription}>{itemDescription}</Text>
-            {sku && (
-              <Text style={styles.skuText}>
-                <Text style={styles.label}>SKU:</Text>
-                {sku}
+          {/* Top Section: Two columns */}
+          <View style={styles.topSection}>
+            {/* Left Column: Human-readable information */}
+            <View style={styles.leftColumn}>
+              <Text style={styles.companyName}>{companyName}</Text>
+              {companyAddress && (
+                <Text style={styles.companyAddress}>{companyAddress}</Text>
+              )}
+              <Text style={styles.itemDescription}>{itemDescription}</Text>
+              {sku && (
+                <Text style={styles.skuText}>
+                  <Text style={styles.label}>SKU:</Text>
+                  {sku}
+                </Text>
+              )}
+              <Text style={styles.lotText}>
+                <Text style={styles.label}>LOT:</Text>
+                {lotNumber}
               </Text>
-            )}
-            <Text style={styles.lotText}>
-              <Text style={styles.label}>LOT:</Text>
-              {lotNumber}
-            </Text>
+            </View>
+
+            {/* Right Column: Voice Pick box */}
+            <View style={styles.rightColumn}>
+              {/* Voice Pick Code Box - Inverted (black bg, white text) */}
+              <View style={styles.voicePickContainer}>
+                <Text style={styles.voicePickSmall}>{small}</Text>
+                <Text style={styles.voicePickLarge}>{large}</Text>
+              </View>
+            </View>
           </View>
 
-          {/* Right Column: Voice Pick box and Barcode */}
-          <View style={styles.rightColumn}>
-            {/* Voice Pick Code Box - Inverted (black bg, white text) */}
-            <View style={styles.voicePickContainer}>
-              <Text style={styles.voicePickSmall}>{small}</Text>
-              <Text style={styles.voicePickLarge}>{large}</Text>
-            </View>
-
-            {/* Barcode */}
-            <View style={styles.barcodeWrapper}>
-              {barcodeImageUrl ? (
-                <>
-                  <Image src={barcodeImageUrl} style={styles.barcodeImage} />
-                  <Text style={styles.barcodeText}>{barcodeHRI}</Text>
-                </>
-              ) : (
+          {/* Bottom Section: Full-width centered barcode */}
+          <View style={styles.barcodeWrapper}>
+            {barcodeImageUrl ? (
+              <>
+                <Image src={barcodeImageUrl} style={styles.barcodeImage} />
                 <Text style={styles.barcodeText}>{barcodeHRI}</Text>
-              )}
-            </View>
+              </>
+            ) : (
+              <Text style={styles.barcodeText}>{barcodeHRI}</Text>
+            )}
           </View>
         </View>
       </BaseLabel>
