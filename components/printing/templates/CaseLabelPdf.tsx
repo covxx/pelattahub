@@ -36,26 +36,28 @@ interface CaseLabelData {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
     padding: 6,
     height: '100%',
     justifyContent: 'space-between',
   },
   companyHeader: {
     fontSize: 9,
-    textAlign: 'center',
-    color: '#fff',
+    textAlign: 'left',
+    color: '#000',
     marginBottom: 4,
     fontFamily: 'Helvetica-Bold',
+    paddingLeft: 4,
   },
   productName: {
     fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#fff',
+    textAlign: 'left',
+    color: '#000',
     marginBottom: 8,
     textTransform: 'uppercase',
     fontFamily: 'Helvetica-Bold',
+    paddingLeft: 4,
   },
   contentRow: {
     flexDirection: 'row',
@@ -69,7 +71,7 @@ const styles = StyleSheet.create({
   },
   lotText: {
     fontSize: 11,
-    color: '#fff',
+    color: '#000',
     fontFamily: 'Helvetica',
   },
   label: {
@@ -82,9 +84,9 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   voicePickBox: {
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#000',
     borderStyle: 'solid',
     padding: 6,
     width: 80,
@@ -94,14 +96,14 @@ const styles = StyleSheet.create({
   voicePickSmall: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000',
     marginBottom: 3,
     fontFamily: 'Helvetica-Bold',
   },
   voicePickLarge: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000',
     fontFamily: 'Helvetica-Bold',
     lineHeight: 1,
   },
@@ -118,7 +120,7 @@ const styles = StyleSheet.create({
   barcodeText: {
     fontSize: 7,
     textAlign: 'center',
-    color: '#fff',
+    color: '#000',
     fontFamily: 'Helvetica',
   },
 })
