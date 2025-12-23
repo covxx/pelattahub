@@ -15,10 +15,9 @@ import { Button } from "@/components/ui/button"
 import { MoreVertical, Printer, Edit, History, Package } from "lucide-react"
 import { AdjustQuantityDialog } from "./AdjustQuantityDialog"
 import { ViewHistoryDialog } from "./ViewHistoryDialog"
-import { generateCaseLabel, generatePTILabel, generateMasterLabel } from "@/lib/zpl-generator"
-import { printZplViaBrowser } from "@/lib/print-service"
 import { getCompanySettings } from "@/app/actions/settings"
 import { getLotWithReceivingEvent } from "@/app/actions/inventory"
+import { usePrintLabel } from "@/hooks/usePrintLabel"
 import { useToast } from "@/hooks/useToast"
 import type { InventoryLot } from "@/types/inventory"
 
@@ -33,6 +32,10 @@ export function LotRow({ lot, daysLeft, expiryStatus }: LotRowProps) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [companySettings, setCompanySettings] = useState<any>(null)
   const { toast } = useToast()
+  
+  // PDF printing hooks
+  const { printLabel: printPalletLabel } = usePrintLabel('pallet')
+  const { printLabel: printCaseLabel } = usePrintLabel('case')
 
   // Fetch company settings on mount
   useEffect(() => {
@@ -111,16 +114,15 @@ export function LotRow({ lot, daysLeft, expiryStatus }: LotRowProps) {
         gtin: lot.product.gtin || undefined
       }
 
-      const zpl = generateMasterLabel(lotForLabel, productForLabel)
-      
-      printZplViaBrowser(zpl, {
-        windowTitle: `Pallet Label - Lot ${lot.lot_number}`,
+      printPalletLabel({
+        lot: lotForLabel,
+        product: productForLabel
       })
 
-      toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
+      toast("Generating PDF label...", "info")
     } catch (err) {
       toast(
-        `Print failed: ${err instanceof Error ? err.message : "Failed to open print window. Please allow popups."}`,
+        `Print failed: ${err instanceof Error ? err.message : "Failed to generate PDF label."}`,
         "error"
       )
     }
@@ -128,47 +130,34 @@ export function LotRow({ lot, daysLeft, expiryStatus }: LotRowProps) {
 
   const handleReprint = () => {
     if (!lot.product.gtin) {
-      toast("Cannot print: Product missing GTIN", "error")
+      toast("Product GTIN is required for case label printing", "error")
       return
     }
 
     try {
-      // Use PTI label if company settings are loaded
-      let zpl
-      if (companySettings) {
-        zpl = generatePTILabel(
-          lot,
-          {
-            name: lot.product.name,
-            gtin: lot.product.gtin,
-            unit_type: lot.product.unit_type,
-          },
-          companySettings,
-          {
-            caseWeight: lot.product.standard_case_weight || undefined,
-            unitType: lot.product.unit_type,
-            origin: lot.origin_country || undefined,
-          }
-        )
-      } else {
-        // Fallback to standard case label
-        zpl = generateCaseLabel(lot, {
-          name: lot.product.name,
-          gtin: lot.product.gtin,
-          variety: lot.product.variety,
-        })
+      // Prepare lot data for case label PDF
+      const lotForLabel = {
+        lot_number: lot.lot_number,
+        received_date: lot.received_date,
+        expiry_date: lot.expiry_date
       }
-      
-      // Print via browser's native print dialog
-      printZplViaBrowser(zpl, {
-        windowTitle: `Label - Lot ${lot.lot_number}`,
+
+      const productForLabel = {
+        name: lot.product.name,
+        gtin: lot.product.gtin,
+        variety: lot.product.variety || null
+      }
+
+      printCaseLabel({
+        lot: lotForLabel,
+        product: productForLabel,
+        companySettings: companySettings || undefined
       })
 
-      // Show instruction toast
-      toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
+      toast("Generating PDF label...", "info")
     } catch (err) {
       toast(
-        `Print failed: ${err instanceof Error ? err.message : "Failed to open print window. Please allow popups."}`,
+        `Print failed: ${err instanceof Error ? err.message : "Failed to generate PDF label."}`,
         "error"
       )
     }

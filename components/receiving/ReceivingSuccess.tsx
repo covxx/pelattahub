@@ -1,8 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { generateProduceLabel } from "@/lib/zpl-generator"
-import { printZplViaBrowser } from "@/lib/print-service"
+import { usePrintLabel } from "@/hooks/usePrintLabel"
 import { useToast } from "@/hooks/useToast"
 import { ToastContainer } from "@/components/ui/toast"
 import { Printer } from "lucide-react"
@@ -15,24 +14,39 @@ interface ReceivingSuccessProps {
 
 export function ReceivingSuccess({ lotData, onClose }: ReceivingSuccessProps) {
   const { toasts, toast, removeToast } = useToast()
+  const { printLabel: printCaseLabel } = usePrintLabel('case')
 
   const handlePrint = () => {
     try {
-      // Generate ZPL string
-      const zplString = generateProduceLabel(lotData)
+      if (!lotData.product.gtin) {
+        toast("Product GTIN is required for case label printing", "error")
+        return
+      }
 
-      // Print via browser's native print dialog
-      printZplViaBrowser(zplString, {
-        windowTitle: `Label - Lot ${lotData.lot_number || ""}`,
+      // Prepare lot data for case label PDF
+      const lotForLabel = {
+        lot_number: lotData.lot_number,
+        received_date: lotData.received_date,
+        expiry_date: lotData.expiry_date
+      }
+
+      const productForLabel = {
+        name: lotData.product.name,
+        gtin: lotData.product.gtin,
+        variety: lotData.product.variety || null
+      }
+
+      printCaseLabel({
+        lot: lotForLabel,
+        product: productForLabel
       })
 
-      // Show instruction toast
-      toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
+      toast("Generating PDF label...", "info")
     } catch (err) {
       const errorMessage =
         err instanceof Error
           ? err.message
-          : "Failed to open print window. Please allow popups."
+          : "Failed to generate PDF label."
       toast(errorMessage, "error")
     }
   }
@@ -42,7 +56,7 @@ export function ReceivingSuccess({ lotData, onClose }: ReceivingSuccessProps) {
       <div className="space-y-4">
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            💡 Click "Print Label" to open the browser print dialog. Select your ZPL or Generic/Text printer.
+            💡 Click "Print Label" to generate and print a PDF label.
           </p>
         </div>
 

@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Printer, FileText, ArrowLeft, Edit2, Check, X, Package } from "lucide-react"
 import { finalizeReceivingEvent, updateLotQuantity } from "@/app/actions/receiving"
 import { getCompanySettings } from "@/app/actions/settings"
-import { generateMasterLabel, generatePTILabel } from "@/lib/zpl-generator"
-import { printZplViaBrowser } from "@/lib/print-service"
+import { usePrintLabel } from "@/hooks/usePrintLabel"
 import { useToast } from "@/hooks/useToast"
 import { ToastContainer } from "@/components/ui/toast"
 import { ReceivingReceiptPDF } from "@/components/documents/ReceivingReceiptPDF"
@@ -33,6 +32,10 @@ export function ReceivingEventDetail({
   const [editQuantity, setEditQuantity] = useState<number>(0)
   const [isSaving, setIsSaving] = useState(false)
   const { toast, toasts, removeToast } = useToast()
+  
+  // PDF printing hooks
+  const { printLabel: printPalletLabel } = usePrintLabel('pallet')
+  const { printLabel: printCaseLabel } = usePrintLabel('case')
 
   // Fetch company settings on mount
   useEffect(() => {
@@ -57,25 +60,34 @@ export function ReceivingEventDetail({
 
   const handlePrintPalletLabel = (lot: any) => {
     try {
-      // Use master pallet label (4x6)
-      const lotWithVendor = {
-        ...lot,
+      // Prepare lot data for pallet label PDF
+      const lotForLabel = {
+        lot_number: lot.lot_number,
+        received_date: lot.received_date,
+        original_quantity: lot.original_quantity ?? lot.quantity_received ?? lot.quantity_current,
+        quantity_current: lot.quantity_current,
         receivingEvent: event ? {
           vendor: event.vendor
         } : undefined
       }
-      const zpl = generateMasterLabel(lotWithVendor, lot.product)
       
-      printZplViaBrowser(zpl, {
-        windowTitle: `Pallet Label - ${lot.lot_number}`,
+      const productForLabel = {
+        name: lot.product.name,
+        unit_type: lot.product.unit_type || "CASE",
+        gtin: lot.product.gtin || undefined
+      }
+      
+      printPalletLabel({
+        lot: lotForLabel,
+        product: productForLabel
       })
 
-      toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
+      toast("Generating PDF label...", "info")
     } catch (err) {
       toast(
         err instanceof Error
           ? err.message
-          : "Failed to open print window. Please allow popups.",
+          : "Failed to generate PDF label.",
         "error"
       )
     }
@@ -83,49 +95,63 @@ export function ReceivingEventDetail({
 
   const handlePrintAllLabels = () => {
     try {
-      // Concatenate all labels into one print job
-      const allZpl = event.lots
-        .map((lot: any) => {
-          // Use PTI label if company settings are loaded
-          if (companySettings) {
-            return generatePTILabel(
-              lot,
-              lot.product,
-              companySettings,
-              {
-                caseWeight: lot.product.standard_case_weight,
-                unitType: lot.product.unit_type,
-                origin: lot.origin_country,
-              }
-            )
+      // Print all labels (staggered to avoid browser blocking)
+      event.lots.forEach((lot: any, index: number) => {
+        setTimeout(() => {
+          // Use case label if product has GTIN, otherwise use pallet label
+          if (lot.product.gtin && companySettings) {
+            const lotForLabel = {
+              lot_number: lot.lot_number,
+              received_date: lot.received_date,
+              expiry_date: lot.expiry_date
+            }
+            
+            const productForLabel = {
+              name: lot.product.name,
+              gtin: lot.product.gtin,
+              variety: lot.product.variety || null
+            }
+            
+            printCaseLabel({
+              lot: lotForLabel,
+              product: productForLabel,
+              companySettings: companySettings
+            })
           } else {
-            // Use master pallet label (4x6)
-            const lotWithVendor = {
-              ...lot,
+            // Fallback to pallet label
+            const lotForLabel = {
+              lot_number: lot.lot_number,
+              received_date: lot.received_date,
+              original_quantity: lot.original_quantity ?? lot.quantity_received ?? lot.quantity_current,
+              quantity_current: lot.quantity_current,
               receivingEvent: event ? {
                 vendor: event.vendor
               } : undefined
             }
-            return generateMasterLabel(lotWithVendor, lot.product)
+            
+            const productForLabel = {
+              name: lot.product.name,
+              unit_type: lot.product.unit_type || "CASE",
+              gtin: lot.product.gtin || undefined
+            }
+            
+            printPalletLabel({
+              lot: lotForLabel,
+              product: productForLabel
+            })
           }
-        })
-        .join('\n\n')
-      
-      // Print via browser's native print dialog
-      printZplViaBrowser(allZpl, {
-        windowTitle: `All Labels - Receipt ${event.id.slice(0, 8).toUpperCase()}`,
+        }, index * 1000) // Stagger prints by 1 second
       })
-
-      // Show instruction toast
+      
       toast(
-        `Printing ${event.lots.length} label(s). Select your ZPL/Generic/Text printer.`,
+        `Generating ${event.lots.length} label(s)...`,
         "info"
       )
     } catch (err) {
       toast(
         err instanceof Error
           ? err.message
-          : "Failed to open print window. Please allow popups.",
+          : "Failed to generate PDF labels.",
         "error"
       )
     }

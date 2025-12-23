@@ -9,8 +9,7 @@ import { ProductCombobox } from "@/components/receiving/ProductCombobox"
 import { UnitToggle } from "@/components/rugged/UnitToggle"
 import { convertInventory, batchConvertInventory, getLotByLotNumber } from "@/app/actions/production"
 import { useToast } from "@/hooks/useToast"
-import { printZplViaBrowser } from "@/lib/print-service"
-import { generatePTILabel } from "@/lib/zpl-generator"
+import { usePrintLabel } from "@/hooks/usePrintLabel"
 import { format } from "date-fns"
 import { Package, ArrowRight, Printer, Plus, X } from "lucide-react"
 import type { Product } from "@/types/product"
@@ -46,6 +45,7 @@ export function ProductionRepackForm({ products }: ProductionRepackFormProps) {
   const [unitType, setUnitType] = useState<"CASE" | "LBS">("CASE")
   const [isPending, startTransition] = useTransition()
   const { toast } = useToast()
+  const { printLabel: printCaseLabel } = usePrintLabel('case')
   const [companySettings, setCompanySettings] = useState<{
     name: string
     address: string
@@ -184,29 +184,27 @@ export function ProductionRepackForm({ products }: ProductionRepackFormProps) {
         // Print label
         try {
           const outputProduct = products.find((p) => p.id === outputProductId)
-          if (outputProduct && companySettings) {
-            const zpl = generatePTILabel(
-              {
+          if (outputProduct && outputProduct.gtin) {
+            printCaseLabel({
+              lot: {
                 lot_number: destinationLot.lot_number,
                 received_date: destinationLot.received_date,
+                expiry_date: destinationLot.expiry_date
               },
-              {
+              product: {
                 name: outputProduct.name,
                 gtin: outputProduct.gtin,
-                unit_type: outputProduct.unit_type || unitType,
+                variety: outputProduct.variety || null
               },
-              companySettings,
-              {
-                unitType: unitType,
-                origin: destinationLot.origin_country,
-                caseWeight: outputProduct.standard_case_weight || undefined,
-              }
-            )
-            printZplViaBrowser(zpl, { windowTitle: `Label - ${destinationLot.lot_number}` })
-            toast("Print dialog opened. Select your ZPL/Generic/Text printer driver.", "info")
+              companySettings: companySettings || undefined
+            })
+            toast("Generating PDF label...", "info")
+          } else if (!outputProduct?.gtin) {
+            toast("Product GTIN is required for label printing", "error")
           }
         } catch (printError) {
           console.error("Failed to print label:", printError)
+          toast("Failed to generate PDF label", "error")
           // Don't fail the whole operation if printing fails
         }
 
