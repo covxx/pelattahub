@@ -92,17 +92,34 @@ echo "✅ Maintenance mode enabled."
 
 echo "🚀 Restarting services on remote server..."
 
+# Create temporary override file to use the loaded image instead of building
+echo "   Creating temporary override to use loaded image..."
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && cat > docker-compose.override.tmp.yml << 'EOF'
+services:
+  app:
+    image: wms-app
+  qbo-sync:
+    image: wms-app
+EOF
+"
+
 # Use production override if it exists, otherwise use base compose file
+# Always use --no-build to prevent building on remote server
+# Use --force-recreate to ensure containers use the new image
 if ssh ${SSH_OPTS} "${REMOTE_HOST}" "test -f ${REMOTE_DIR}/docker-compose.prod.yml"; then
-  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
+  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.override.tmp.yml up -d --no-build --force-recreate"
 else
-  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose up -d"
+  ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose -f docker-compose.yml -f docker-compose.override.tmp.yml up -d --no-build --force-recreate"
 fi
 
 if [ $? -ne 0 ]; then
   echo "❌ Failed to restart services on remote server!"
   exit 1
 fi
+
+# Clean up temporary override file
+echo "   Cleaning up temporary override file..."
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && rm -f docker-compose.override.tmp.yml"
 
 echo "✅ Deployment complete!"
 echo ""
