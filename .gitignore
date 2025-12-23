@@ -70,3 +70,7 @@ logs/
 # Build artifacts
 dist/
 build/
+
+# Documentation (local only, not pushed to repo)
+END_OF_DAY_SUMMARY.md
+*.summary.md
