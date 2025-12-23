@@ -65,6 +65,18 @@ fi
 echo "✅ Image transferred successfully!"
 
 # =============================================================================
+# CLEANUP DOCKER RESOURCES ON LOCAL DEV SERVER
+# =============================================================================
+echo ""
+echo "🧹 Cleaning up Docker resources on local dev server..."
+echo "   Removing unused images and build cache older than 24h..."
+
+# Clean up unused images and build cache on local machine
+docker image prune -f && docker builder prune -af --filter "until=24h" || echo "⚠️  Local cleanup had some issues (non-critical)"
+
+echo "✅ Local cleanup complete"
+
+# =============================================================================
 # PULL LATEST CODE ON REMOTE SERVER
 # =============================================================================
 echo "📥 Pulling latest code on remote server..."
@@ -98,16 +110,16 @@ echo "📊 Checking service status..."
 ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && docker compose ps"
 
 # =============================================================================
-# CLEANUP DOCKER RESOURCES
+# CLEANUP DOCKER RESOURCES ON REMOTE PRODUCTION SERVER
 # =============================================================================
 echo ""
-echo "🧹 Cleaning up Docker resources on remote server..."
+echo "🧹 Cleaning up Docker resources on remote production server..."
 echo "   Removing unused images and build cache older than 24h..."
 
-# Clean up unused images and build cache
-ssh ${SSH_OPTS} "${REMOTE_HOST}" "docker image prune -f && docker builder prune -af --filter 'until=24h'" || echo "⚠️  Cleanup had some issues (non-critical)"
+# Clean up unused images and build cache on remote server
+ssh ${SSH_OPTS} "${REMOTE_HOST}" "docker image prune -f && docker builder prune -af --filter 'until=24h'" || echo "⚠️  Remote cleanup had some issues (non-critical)"
 
-echo "✅ Cleanup complete"
+echo "✅ Remote cleanup complete"
 echo ""
 
 echo "📋 Next steps on production server:"
