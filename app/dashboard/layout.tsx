@@ -1,8 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { DashboardNav } from "@/components/dashboard/DashboardNav"
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
-import { MobileHeader } from "@/components/dashboard/MobileHeader"
+import { ConditionalDashboardNav } from "@/components/dashboard/ConditionalDashboardNav"
+import { ConditionalContentArea } from "@/components/dashboard/ConditionalContentArea"
 
 export default async function DashboardLayout({
   children,
@@ -17,26 +16,13 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile Header - Only visible on mobile (below md breakpoint) */}
-      <div className="block md:hidden">
-        <MobileHeader user={session.user} />
-      </div>
-
-      {/* Desktop Sidebar - Hidden on mobile, visible on md and up */}
-      <DashboardNav user={session.user} />
+      {/* Conditionally render sidebar and header based on route */}
+      <ConditionalDashboardNav user={session.user} />
       
-      {/* Main Content Area - No left padding on mobile, padding on desktop for sidebar */}
-      <div className="w-full md:pl-64">
-        {/* Desktop Header - Hidden on mobile, visible on md and up */}
-        <div className="hidden md:block">
-          <DashboardHeader user={session.user} />
-        </div>
-        
-        {/* Page Content */}
-        <main className="w-full py-4 px-4 md:py-6 md:px-6 lg:px-8">
-          {children}
-        </main>
-      </div>
+      {/* Main Content Area - Adjust padding based on sidebar visibility */}
+      <ConditionalContentArea>
+        {children}
+      </ConditionalContentArea>
     </div>
   )
 }
