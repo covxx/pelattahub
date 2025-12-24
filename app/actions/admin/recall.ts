@@ -88,13 +88,13 @@ const recallInputSchema = z
     message: "Provide either lotNumber or orderNumber",
   })
 
-async function requireAdmin() {
+async function requireAdminOrManager() {
   const session = await auth()
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN" && session.user.role !== "SRJLABS") {
-    throw new Error("Admin access required")
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
+    throw new Error("Admin or Manager access required")
   }
   return session
 }
@@ -273,7 +273,7 @@ export async function generateRecallReport(input: {
   lotNumber?: string
   orderNumber?: string
 }): Promise<RecallReportResult | null> {
-  await requireAdmin()
+  await requireAdminOrManager()
   const parsed = recallInputSchema.parse(input)
 
   if (parsed.lotNumber) {

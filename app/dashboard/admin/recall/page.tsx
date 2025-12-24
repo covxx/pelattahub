@@ -16,8 +16,8 @@ export default async function RecallReportPage({
     redirect("/login")
   }
 
-  // Allow ADMIN and MANAGER roles
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+  // Allow ADMIN, MANAGER, and SRJLABS roles (consistent with recall actions)
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
     redirect("/dashboard")
   }
 
