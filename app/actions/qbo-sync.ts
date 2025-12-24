@@ -529,7 +529,7 @@ async function performQboInvoiceSync(actorUserId: string) {
         imported: 0,
         total: 0,
         skipped: 0,
-        skippedDetails: undefined,
+        skippedDetails: [],
         invoiceIdsFound: [],
         errors: undefined,
         message: "No open invoices found in QuickBooks Online",
@@ -684,7 +684,7 @@ async function performQboInvoiceSync(actorUserId: string) {
       imported,
       total: qboInvoices.length,
       skipped: skipped.length,
-      skippedDetails: skipped.length > 0 ? skipped : undefined,
+      skippedDetails: skipped,
       invoiceIdsFound: invoiceIds,
       errors: errors.length > 0 ? errors : undefined,
     }
