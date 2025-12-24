@@ -314,6 +314,14 @@ if [ "$CONTAINER_READY" = false ]; then
   echo -e "${YELLOW}⚠️  Container may not be fully ready, attempting migration check anyway...${NC}"
 fi
 
+# Check database connectivity first
+echo -e "${BLUE}   Checking database connectivity...${NC}"
+DB_CHECK=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 db execute --stdin <<< 'SELECT 1;' 2>&1" || echo "ERROR")
+if echo "$DB_CHECK" | grep -q "ERROR\|error\|Error\|ECONNREFUSED\|timeout"; then
+  echo -e "${YELLOW}⚠️  Database may not be ready yet, waiting 5 more seconds...${NC}"
+  sleep 5
+fi
+
 # First, check if there are pending migrations
 echo -e "${BLUE}   Checking for pending migrations...${NC}"
 
