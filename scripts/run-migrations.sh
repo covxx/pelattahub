@@ -121,7 +121,7 @@ if ! docker compose exec -T app sh -c "npx --yes prisma@6.19.0 generate" >/dev/n
 fi
 echo ""
 
-# Run migrations
+# Run migrations with progress timer
 echo -e "${BLUE}🔄 Running database migrations...${NC}"
 echo -e "${YELLOW}   Using timeout: ${TIMEOUT}s${NC}"
 echo ""
@@ -129,11 +129,95 @@ echo ""
 MIGRATION_SUCCESS=false
 MIGRATION_OUTPUT=""
 EXIT_CODE=0
+START_TIME=$(date +%s)
+
+# Function to show timer progress
+show_timer() {
+  local elapsed=$1
+  local timeout=$2
+  local remaining=$((timeout - elapsed))
+  
+  if [ $remaining -lt 0 ]; then
+    remaining=0
+  fi
+  
+  local percent=$((elapsed * 100 / timeout))
+  if [ $percent -gt 100 ]; then
+    percent=100
+  fi
+  
+  # Show progress with color coding
+  if [ $remaining -lt 5 ]; then
+    echo -ne "\r${RED}⏱️  Elapsed: ${elapsed}s | Remaining: ${remaining}s | Progress: ${percent}%${NC}"
+  elif [ $remaining -lt 10 ]; then
+    echo -ne "\r${YELLOW}⏱️  Elapsed: ${elapsed}s | Remaining: ${remaining}s | Progress: ${percent}%${NC}"
+  else
+    echo -ne "\r${BLUE}⏱️  Elapsed: ${elapsed}s | Remaining: ${remaining}s | Progress: ${percent}%${NC}"
+  fi
+}
+
+# Function to run migration with timer
+run_migration_with_timer() {
+  local timeout_sec=$1
+  local use_timeout=$2
+  local temp_output=$(mktemp)
+  local migration_pid
+  local timer_pid
+  
+  # Start migration in background
+  if [ "$use_timeout" = "true" ]; then
+    timeout "$timeout_sec" docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" > "$temp_output" 2>&1 &
+  else
+    docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" > "$temp_output" 2>&1 &
+  fi
+  migration_pid=$!
+  
+  # Start timer display in background
+  (
+    local elapsed=0
+    while kill -0 $migration_pid 2>/dev/null; do
+      sleep 1
+      elapsed=$((elapsed + 1))
+      
+      if [ "$use_timeout" = "true" ] && [ $elapsed -le $timeout_sec ]; then
+        show_timer $elapsed $timeout_sec
+      elif [ "$use_timeout" = "true" ]; then
+        # Past timeout, but process still running
+        echo -ne "\r${YELLOW}⏱️  Elapsed: ${elapsed}s | Past timeout: ${timeout_sec}s | Waiting...${NC}"
+      else
+        # No timeout, just show elapsed time
+        echo -ne "\r${BLUE}⏱️  Elapsed: ${elapsed}s | Running...${NC}"
+      fi
+    done
+  ) &
+  timer_pid=$!
+  
+  # Wait for migration process to complete
+  wait $migration_pid
+  EXIT_CODE=$?
+  
+  # Stop timer display
+  kill $timer_pid 2>/dev/null || true
+  wait $timer_pid 2>/dev/null || true
+  
+  # Clear the timer line
+  echo -ne "\r${NC}"
+  echo ""
+  
+  # Read output
+  MIGRATION_OUTPUT=$(cat "$temp_output")
+  rm -f "$temp_output"
+  
+  # Calculate final elapsed time
+  local end_time=$(date +%s)
+  local total_elapsed=$((end_time - START_TIME))
+  
+  echo -e "${BLUE}   Migration completed in ${total_elapsed}s${NC}"
+}
 
 if command -v timeout >/dev/null 2>&1; then
   echo -e "${BLUE}   Executing: npx prisma@6.19.0 migrate deploy${NC}"
-  MIGRATION_OUTPUT=$(timeout "$TIMEOUT" docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" 2>&1)
-  EXIT_CODE=$?
+  run_migration_with_timer "$TIMEOUT" "true"
   
   if [ $EXIT_CODE -eq 0 ]; then
     MIGRATION_SUCCESS=true
@@ -145,8 +229,7 @@ if command -v timeout >/dev/null 2>&1; then
 else
   echo -e "${YELLOW}⚠️  'timeout' command not available, running without timeout${NC}"
   echo -e "${BLUE}   Executing: npx prisma@6.19.0 migrate deploy${NC}"
-  MIGRATION_OUTPUT=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" 2>&1)
-  EXIT_CODE=$?
+  run_migration_with_timer 0 "false"  # No timeout, just show elapsed time
   
   if [ $EXIT_CODE -eq 0 ]; then
     MIGRATION_SUCCESS=true
