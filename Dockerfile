@@ -11,20 +11,9 @@ RUN npm install --legacy-peer-deps
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Install git for commit ID extraction
-RUN apk add --no-cache git
-
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Get git commit ID (if available) and set as build arg
-# This will be available as NEXT_PUBLIC_COMMIT_ID during build
-ARG COMMIT_ID
-# Try to get commit ID from git if not provided as build arg
-RUN if [ -z "$COMMIT_ID" ] && [ -d .git ]; then \
-      COMMIT_ID=$(git rev-parse --short HEAD 2>/dev/null || echo ""); \
-    fi
 
 # Generate Prisma Client
 # Provide a dummy DATABASE_URL for build time (prisma generate doesn't actually connect)
@@ -33,9 +22,6 @@ RUN npx prisma@6.19.0 generate
 
 # Build Next.js application
 ENV NEXT_TELEMETRY_DISABLED=1
-# Set commit ID as environment variable for Next.js build (NEXT_PUBLIC_ prefix makes it available client-side)
-ARG COMMIT_ID
-ENV NEXT_PUBLIC_COMMIT_ID=${COMMIT_ID:-}
 RUN npm run build
 
 # Stage 3: Runner

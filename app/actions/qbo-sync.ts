@@ -100,7 +100,7 @@ async function requireAdminOrManager() {
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
     throw new Error("Admin or Manager access required")
   }
   return session
@@ -291,18 +291,6 @@ export async function importQboItems() {
           if (skuExists) {
             errors.push(
               `SKU ${wmsData.sku} already exists. Skipping ${qboItem.Name}`
-            )
-            continue
-          }
-
-          // Check if GTIN already exists (to avoid duplicate GTIN constraint violation)
-          const gtinExists = await prisma.product.findUnique({
-            where: { gtin: wmsData.gtin },
-          })
-
-          if (gtinExists) {
-            errors.push(
-              `GTIN ${wmsData.gtin} already exists for product ${gtinExists.name} (${gtinExists.sku}). Skipping ${qboItem.Name}`
             )
             continue
           }
@@ -916,4 +904,3 @@ export async function getReceivingEventsForQboSync() {
     }
   }
 }
-
