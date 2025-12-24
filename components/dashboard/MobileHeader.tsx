@@ -108,7 +108,7 @@ const adminNavigation = [
     name: "System Health",
     href: "/dashboard/admin/health",
     icon: Activity,
-    roles: ["ADMIN", "MANAGER"],
+    roles: ["ADMIN"],
   },
   {
     name: "Products",
