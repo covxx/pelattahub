@@ -16,6 +16,7 @@ import {
 import { RefreshCw, Trash2, Recycle } from "lucide-react"
 import { getSystemHealth, purgeCache, runGarbageCollection } from "@/app/actions/health"
 import { format } from "date-fns"
+import { getVersionInfo } from "@/lib/version"
 import type { SystemHealth } from "@/app/actions/health"
 
 interface SystemHealthDashboardProps {
@@ -28,6 +29,7 @@ export function SystemHealthDashboard({ initialHealth }: SystemHealthDashboardPr
   const [isPurging, startPurge] = useTransition()
   const [isRunningGC, startGC] = useTransition()
   const router = useRouter()
+  const versionInfo = getVersionInfo()
 
   const handleRefresh = () => {
     startRefresh(async () => {
@@ -92,6 +94,12 @@ export function SystemHealthDashboard({ initialHealth }: SystemHealthDashboardPr
           <h2 className="text-2xl font-bold">System Status</h2>
           <p className="text-muted-foreground">
             Real-time system health metrics and diagnostics
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            PalettaHub v{versionInfo.version} "{versionInfo.name}"
+            {versionInfo.commitId !== 'dev' && (
+              <span className="ml-2 font-mono">({versionInfo.commitId})</span>
+            )}
           </p>
         </div>
         <Button

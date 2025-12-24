@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { getVersionInfo } from "@/lib/version"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const versionInfo = getVersionInfo()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,6 +112,16 @@ export default function LoginPage() {
               </p>
             </div>
           )}
+
+          {/* Version Info */}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-center text-muted-foreground">
+              PalettaHub v{versionInfo.version} "{versionInfo.name}"
+              {versionInfo.commitId !== 'dev' && (
+                <span className="ml-2 font-mono">({versionInfo.commitId})</span>
+              )}
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
