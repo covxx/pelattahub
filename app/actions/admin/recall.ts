@@ -1,9 +1,9 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
+import { requireAdminOrManager } from "@/lib/auth-helpers"
 
 type RecallOrderSummary = {
   orderId: string
@@ -88,17 +88,6 @@ const recallInputSchema = z
     message: "Provide either lotNumber or orderNumber",
   })
 
-async function requireAdminOrManager() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  const role = session.user.role as string
-  if (!["ADMIN", "MANAGER", "SRJLABS"].includes(role)) {
-    throw new Error("Admin or Manager access required")
-  }
-  return session
-}
 
 const lotInclude = {
   product: { select: { name: true, sku: true, unit_type: true } },

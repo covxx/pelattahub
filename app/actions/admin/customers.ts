@@ -1,20 +1,8 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-
-async function requireAdminOrManager() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  const role = session.user.role as string
-  if (!["ADMIN", "MANAGER", "SRJLABS"].includes(role)) {
-    throw new Error("Admin or Manager access required")
-  }
-  return session
-}
+import { requireAdminOrManager } from "@/lib/auth-helpers"
 
 /**
  * Get all customers

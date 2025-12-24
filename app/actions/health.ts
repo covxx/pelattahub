@@ -1,21 +1,10 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
 import { unstable_noStore as noStore } from "next/cache"
-
-async function requireAdminOrManager() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
-    throw new Error("Admin or Manager access required")
-  }
-  return session
-}
+import { requireAdminOrManager } from "@/lib/auth-helpers"
 
 export interface SystemHealth {
   status: "OK" | "DEGRADED"

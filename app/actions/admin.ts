@@ -1,19 +1,7 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-
-async function requireAdminOrManager() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  const role = session.user.role as string
-  if (!["ADMIN", "MANAGER", "SRJLABS"].includes(role)) {
-    throw new Error("Admin, Manager, or SRJLABS access required")
-  }
-  return session
-}
+import { requireAdminOrManager } from "@/lib/auth-helpers"
 
 /**
  * Get admin dashboard statistics

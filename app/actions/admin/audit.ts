@@ -1,19 +1,7 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-
-async function requireAdmin() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  const role = session.user.role as string
-  if (!["ADMIN", "SRJLABS"].includes(role)) {
-    throw new Error("Admin access required")
-  }
-  return session
-}
+import { requireAdmin } from "@/lib/auth-helpers"
 
 /**
  * Get audit logs with filters

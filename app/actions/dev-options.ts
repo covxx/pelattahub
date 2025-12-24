@@ -1,22 +1,8 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-
-/**
- * Check if current user is SRJLABS (super admin)
- */
-async function requireSrjLabs() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  if (session.user.role !== "SRJLABS") {
-    throw new Error("SRJLABS access required")
-  }
-  return session
-}
+import { requireSrjLabs } from "@/lib/auth-helpers"
 
 /**
  * Clear all inventory lots

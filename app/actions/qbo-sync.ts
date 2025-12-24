@@ -1,6 +1,5 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
@@ -14,6 +13,7 @@ import {
 } from "@/lib/qbo"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 import { isValidGTIN, generateUniqueGTIN } from "@/lib/gtin"
+import { requireAdminOrManager } from "@/lib/auth-helpers"
 
 type SyncEntity = "customers" | "items" | "vendors" | "invoices"
 
@@ -96,16 +96,6 @@ function buildSyncQuery(entity: SyncEntity, lastSync: Date | null): string {
   }
 }
 
-async function requireAdminOrManager() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
-    throw new Error("Admin or Manager access required")
-  }
-  return session
-}
 
 /**
  * Import customers from QuickBooks Online

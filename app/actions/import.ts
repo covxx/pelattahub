@@ -1,21 +1,10 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 import { UnitType } from "@prisma/client"
-
-async function requireAdminOrManager() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
-    throw new Error("Admin or Manager access required")
-  }
-  return session
-}
+import { requireAdminOrManager } from "@/lib/auth-helpers"
 
 /**
  * Validation result for a single record
