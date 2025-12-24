@@ -10,6 +10,7 @@ import { getNextLotNumber } from "@/lib/lot-number"
 interface BatchReceivingItem {
   productId: string
   quantity: number
+  unitType: "CASE" | "LBS" | "EACH"
 }
 
 interface BatchReceivingInput {
@@ -110,15 +111,39 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
         const expiryDate = new Date(input.date)
         expiryDate.setDate(expiryDate.getDate() + 10)
 
+        // Convert quantity based on unit type
+        // If receiving in LBS but product unit_type is CASE, convert to cases
+        // If receiving in CASE and product unit_type is CASE, use as-is
+        let finalQuantity = item.quantity
+        if (item.unitType === "LBS" && product.unit_type === "CASE") {
+          if (!product.standard_case_weight || product.standard_case_weight <= 0) {
+            throw new Error(
+              `Product ${product.name} requires standard_case_weight to convert from LBS to CASE`
+            )
+          }
+          // Convert pounds to cases: divide by case weight
+          finalQuantity = item.quantity / product.standard_case_weight
+        } else if (item.unitType === "CASE" && product.unit_type === "LBS") {
+          // If receiving in CASE but product unit_type is LBS, convert to pounds
+          if (!product.standard_case_weight || product.standard_case_weight <= 0) {
+            throw new Error(
+              `Product ${product.name} requires standard_case_weight to convert from CASE to LBS`
+            )
+          }
+          // Convert cases to pounds: multiply by case weight
+          finalQuantity = item.quantity * product.standard_case_weight
+        }
+        // If unit types match (CASE/CASE or LBS/LBS), use quantity as-is
+
         // Create inventory lot
         const lot = await tx.inventoryLot.create({
           data: {
             lot_number: lotNumber,
             product_id: product.id,
             receiving_event_id: receivingEvent.id,
-            original_quantity: item.quantity,
-            quantity_received: item.quantity,
-            quantity_current: item.quantity,
+            original_quantity: finalQuantity,
+            quantity_received: finalQuantity,
+            quantity_current: finalQuantity,
             received_date: input.date,
             expiry_date: expiryDate,
             origin_country: product.default_origin_country,

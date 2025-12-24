@@ -221,6 +221,7 @@ export function BatchReceivingForm({
           items: data.items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
+            unitType: item.unitType,
           })),
         })
 
