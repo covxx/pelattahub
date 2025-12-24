@@ -394,7 +394,15 @@ else
   echo "   Status output: $MIGRATION_STATUS"
   echo ""
   
-  if timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+  # Try to apply migrations (with timeout if available)
+  MIGRATION_SUCCESS=false
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" && MIGRATION_SUCCESS=true
+  else
+    docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" && MIGRATION_SUCCESS=true
+  fi
+  
+  if [ "$MIGRATION_SUCCESS" = true ]; then
     echo -e "${GREEN}✅ Migrations completed${NC}"
   else
     echo -e "${RED}❌ Migration failed! Check logs:${NC}"
