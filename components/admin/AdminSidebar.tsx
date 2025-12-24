@@ -67,7 +67,7 @@ export function AdminSidebar({ isAdmin, isManager }: AdminSidebarProps) {
           {/* Back to Main Dashboard */}
           <div>
             <Link
-              href="/dashboard"
+              href="/dashboard/inventory"
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
