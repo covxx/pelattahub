@@ -18,6 +18,7 @@ export default async function AdminDashboardPage() {
   const stats = await getAdminStats()
   const isAdmin = session?.user?.role === "ADMIN"
   const isManager = session?.user?.role === "MANAGER"
+  const isSrjLabs = session?.user?.role === "SRJLABS"
 
   // Navigation cards grouped by category
   const dataManagementCards = [
@@ -77,7 +78,7 @@ export default async function AdminDashboardPage() {
   ]
 
   // Management tools (Admin and Manager)
-  const managementCards = (isAdmin || isManager) ? [
+  const managementCards = (isAdmin || isManager || isSrjLabs) ? [
     {
       href: "/dashboard/admin/recall",
       title: "Recall Management",
@@ -87,7 +88,7 @@ export default async function AdminDashboardPage() {
   ] : []
 
   // Admin only cards
-  const adminOnlyCards = isAdmin ? [
+  const adminOnlyCards = (isAdmin || isSrjLabs) ? [
     {
       href: "/dashboard/admin/logs",
       title: "System Logs",
@@ -190,7 +191,7 @@ export default async function AdminDashboardPage() {
             return (
               <Link key={card.href} href={card.href}>
                 <Card className="h-full hover:shadow-md transition-shadow cursor-pointer group">
-                  <CardHeader>
+        <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                         <Icon className="h-5 w-5 text-primary" />
@@ -203,13 +204,13 @@ export default async function AdminDashboardPage() {
                     <CardDescription className="text-xs">
                       {card.description}
                     </CardDescription>
-                  </CardHeader>
+        </CardHeader>
                   {card.statLabel && (
                     <CardContent>
                       <p className="text-xs text-muted-foreground">
                         {card.statLabel}
-                      </p>
-                    </CardContent>
+          </p>
+        </CardContent>
                   )}
                 </Card>
               </Link>
@@ -289,7 +290,7 @@ export default async function AdminDashboardPage() {
                         {card.description}
                       </CardDescription>
                     </CardHeader>
-                  </Card>
+      </Card>
                 </Link>
               )
             })}

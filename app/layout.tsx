@@ -36,26 +36,26 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
-          <ZebraPrinterProvider>
-            <div className="min-h-screen flex flex-col">
-              <main className="flex-1">{children}</main>
-              <footer className="border-t bg-muted/30">
-                <div className="container mx-auto flex flex-col gap-2 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                  <div className="font-medium text-foreground">
-                    © {new Date().getFullYear()} SRJLabs. All rights reserved.
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <Link href="/privacy" className="hover:text-foreground">
-                      Privacy Policy
-                    </Link>
-                    <Link href="/terms" className="hover:text-foreground">
-                      Terms &amp; Conditions
-                    </Link>
-                  </div>
+        <ZebraPrinterProvider>
+          <div className="min-h-screen flex flex-col">
+            <main className="flex-1">{children}</main>
+            <footer className="border-t bg-muted/30">
+              <div className="container mx-auto flex flex-col gap-2 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <div className="font-medium text-foreground">
+                  © {new Date().getFullYear()} SRJLabs. All rights reserved.
                 </div>
-              </footer>
-            </div>
-          </ZebraPrinterProvider>
+                <div className="flex items-center gap-4">
+                  <Link href="/privacy" className="hover:text-foreground">
+                    Privacy Policy
+                  </Link>
+                  <Link href="/terms" className="hover:text-foreground">
+                    Terms &amp; Conditions
+                  </Link>
+                </div>
+              </div>
+            </footer>
+          </div>
+        </ZebraPrinterProvider>
         </ThemeProvider>
       </body>
     </html>

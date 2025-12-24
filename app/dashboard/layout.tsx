@@ -21,7 +21,7 @@ export default async function DashboardLayout({
       
       {/* Main Content Area - Adjust padding based on sidebar visibility */}
       <ConditionalContentArea>
-        {children}
+          {children}
       </ConditionalContentArea>
     </div>
   )

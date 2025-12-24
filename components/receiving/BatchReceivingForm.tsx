@@ -637,11 +637,11 @@ export function BatchReceivingForm({
                             <FormItem>
                               <FormControl>
                                 <div className="flex justify-center md:justify-start">
-                                  <UnitToggle
-                                    value={field.value as "CASE" | "LBS"}
-                                    onChange={(value) => field.onChange(value)}
-                                    disabled={!selectedProduct}
-                                  />
+                                <UnitToggle
+                                  value={field.value as "CASE" | "LBS"}
+                                  onChange={(value) => field.onChange(value)}
+                                  disabled={!selectedProduct}
+                                />
                                 </div>
                               </FormControl>
                               <FormMessage />

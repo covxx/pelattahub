@@ -14,7 +14,9 @@ import {
   Loader2,
   RefreshCw,
   Building2,
-  FileText
+  FileText,
+  Receipt,
+  AlertCircle
 } from "lucide-react"
 import { 
   importQboCustomers, 
@@ -22,7 +24,8 @@ import {
   importQboVendors,
   importQboInvoices,
   getQboStatus,
-  getQboAuthUrl
+  getQboAuthUrl,
+  getReceivingEventsForQboSync
 } from "@/app/actions/qbo-sync"
 import { useToast } from "@/hooks/useToast"
 import { ToastContainer } from "@/components/ui/toast"
@@ -48,9 +51,43 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
     result: any
     timestamp: Date
   } | null>(null)
+  const [billsSyncStatus, setBillsSyncStatus] = useState<{
+    open: Array<{
+      id: string
+      receipt_number: number
+      received_date: Date
+      vendor: string
+      vendor_has_qbo_id: boolean
+      lots_count: number
+      all_products_have_qbo_id: boolean
+      status: "OPEN"
+    }>
+    finalizedWithoutQbo: Array<{
+      id: string
+      receipt_number: number
+      received_date: Date
+      finalized_at: Date | null
+      vendor: string
+      vendor_has_qbo_id: boolean
+      lots_count: number
+      all_products_have_qbo_id: boolean
+      status: "FINALIZED_NO_SYNC"
+    }>
+    synced: Array<{
+      id: string
+      receipt_number: number
+      received_date: Date
+      finalized_at: Date | null
+      vendor: string
+      qbo_id: string | null
+      lots_count: number
+      status: "SYNCED"
+    }>
+  } | null>(null)
+  const [isLoadingBills, setIsLoadingBills] = useState(false)
   const { toast, toasts, removeToast } = useToast()
 
-  // Fetch connection status on mount and when query params change
+  // Fetch connection status and bills sync status on mount and when query params change
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -68,7 +105,40 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
         console.error("Error fetching QBO status:", error)
       }
     }
+    
+    const fetchBillsStatus = async () => {
+      setIsLoadingBills(true)
+      try {
+        const result = await getReceivingEventsForQboSync()
+        if (result.success) {
+          setBillsSyncStatus({
+            open: result.open,
+            finalizedWithoutQbo: result.finalizedWithoutQbo,
+            synced: result.synced,
+          })
+        } else {
+          // On error, set empty arrays
+          setBillsSyncStatus({
+            open: result.open || [],
+            finalizedWithoutQbo: result.finalizedWithoutQbo || [],
+            synced: result.synced || [],
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching bills sync status:", error)
+        // Set empty state on error
+        setBillsSyncStatus({
+          open: [],
+          finalizedWithoutQbo: [],
+          synced: [],
+        })
+      } finally {
+        setIsLoadingBills(false)
+      }
+    }
+    
     fetchStatus()
+    fetchBillsStatus()
   }, [searchParams])
 
   // Handle success/error query params from OAuth callback
@@ -417,6 +487,226 @@ export function QboSyncDashboard({ isConnected: initialConnected }: QboSyncDashb
           </CardContent>
         </Card>
       </div>
+
+      {/* Bills Sync Status */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Bills Sync Status
+              </CardTitle>
+              <CardDescription>
+                Receiving events and their QuickBooks bill sync status
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setIsLoadingBills(true)
+                try {
+                  const result = await getReceivingEventsForQboSync()
+                  if (result.success) {
+                    setBillsSyncStatus({
+                      open: result.open,
+                      finalizedWithoutQbo: result.finalizedWithoutQbo,
+                      synced: result.synced,
+                    })
+                    toast("Bills sync status refreshed", "success")
+                  } else {
+                    setBillsSyncStatus({
+                      open: result.open || [],
+                      finalizedWithoutQbo: result.finalizedWithoutQbo || [],
+                      synced: result.synced || [],
+                    })
+                    toast(result.error || "Failed to refresh bills status", "error")
+                  }
+                } catch (error) {
+                  toast("Failed to refresh bills status", "error")
+                  setBillsSyncStatus({
+                    open: [],
+                    finalizedWithoutQbo: [],
+                    synced: [],
+                  })
+                } finally {
+                  setIsLoadingBills(false)
+                }
+              }}
+              disabled={isLoadingBills}
+            >
+              {isLoadingBills ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingBills ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : billsSyncStatus ? (
+            <div className="space-y-6">
+              {/* Open Events (Not Finalized) */}
+              {billsSyncStatus.open.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <h3 className="font-semibold text-sm">Open (Not Finalized)</h3>
+                    <Badge variant="outline">{billsSyncStatus.open.length}</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {billsSyncStatus.open.slice(0, 10).map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            Receipt #{event.receipt_number} - {event.vendor}
+                          </div>
+                          <div className="text-muted-foreground text-xs mt-1">
+                            {format(new Date(event.received_date), "MMM dd, yyyy")} • {event.lots_count} lot(s)
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!event.vendor_has_qbo_id && (
+                            <Badge variant="destructive" className="text-xs">
+                              Vendor Missing QBO ID
+                            </Badge>
+                          )}
+                          {!event.all_products_have_qbo_id && (
+                            <Badge variant="destructive" className="text-xs">
+                              Products Missing QBO IDs
+                            </Badge>
+                          )}
+                          {event.vendor_has_qbo_id && event.all_products_have_qbo_id && (
+                            <Badge variant="outline" className="text-xs">
+                              Ready to Finalize
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {billsSyncStatus.open.length > 10 && (
+                      <p className="text-xs text-muted-foreground text-center pt-2">
+                        Showing 10 of {billsSyncStatus.open.length} open events
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Finalized Without QBO Sync */}
+              {billsSyncStatus.finalizedWithoutQbo.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <XCircle className="h-4 w-4 text-red-600" />
+                    <h3 className="font-semibold text-sm">Finalized (Not Synced)</h3>
+                    <Badge variant="destructive">{billsSyncStatus.finalizedWithoutQbo.length}</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {billsSyncStatus.finalizedWithoutQbo.slice(0, 10).map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            Receipt #{event.receipt_number} - {event.vendor}
+                          </div>
+                          <div className="text-muted-foreground text-xs mt-1">
+                            Finalized {event.finalized_at ? format(new Date(event.finalized_at), "MMM dd, yyyy") : "N/A"} • {event.lots_count} lot(s)
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!event.vendor_has_qbo_id && (
+                            <Badge variant="destructive" className="text-xs">
+                              Vendor Missing QBO ID
+                            </Badge>
+                          )}
+                          {!event.all_products_have_qbo_id && (
+                            <Badge variant="destructive" className="text-xs">
+                              Products Missing QBO IDs
+                            </Badge>
+                          )}
+                          {event.vendor_has_qbo_id && event.all_products_have_qbo_id && (
+                            <Badge variant="outline" className="text-xs">
+                              Sync Failed
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {billsSyncStatus.finalizedWithoutQbo.length > 10 && (
+                      <p className="text-xs text-muted-foreground text-center pt-2">
+                        Showing 10 of {billsSyncStatus.finalizedWithoutQbo.length} unsynced events
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Successfully Synced */}
+              {billsSyncStatus.synced.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <h3 className="font-semibold text-sm">Synced to QuickBooks</h3>
+                    <Badge variant="default" className="bg-green-600">
+                      {billsSyncStatus.synced.length}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {billsSyncStatus.synced.slice(0, 10).map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex items-center justify-between p-3 border rounded-lg text-sm bg-green-50 dark:bg-green-950/20"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            Receipt #{event.receipt_number} - {event.vendor}
+                          </div>
+                          <div className="text-muted-foreground text-xs mt-1">
+                            Synced {event.finalized_at ? format(new Date(event.finalized_at), "MMM dd, yyyy") : "N/A"} • QBO Bill: {event.qbo_id}
+                          </div>
+                        </div>
+                        <Badge variant="default" className="bg-green-600">
+                          Synced
+                        </Badge>
+                      </div>
+                    ))}
+                    {billsSyncStatus.synced.length > 10 && (
+                      <p className="text-xs text-muted-foreground text-center pt-2">
+                        Showing 10 of {billsSyncStatus.synced.length} synced events
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {billsSyncStatus.open.length === 0 &&
+                billsSyncStatus.finalizedWithoutQbo.length === 0 &&
+                billsSyncStatus.synced.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Receipt className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No receiving events found</p>
+                  </div>
+                )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Loader2 className="h-6 w-6 mx-auto mb-3 animate-spin" />
+              <p>Loading bills sync status...</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Last Sync Results */}
       {lastSyncResult && lastSyncResult.result.success && (

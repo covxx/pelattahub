@@ -11,7 +11,7 @@ import { revalidatePath } from "next/cache"
  */
 async function requireAdmin() {
   const session = await auth()
-  if (!session?.user || session.user.role !== "ADMIN") {
+  if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SRJLABS")) {
     throw new Error("Unauthorized: Admin access required")
   }
   return session

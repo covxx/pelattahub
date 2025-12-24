@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { unstable_noStore as noStore } from "next/cache"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 import { getNextLotNumber } from "@/lib/lot-number"
+import { getQboConnectionStatus, createQboBill, fetchQboItemById } from "@/lib/qbo"
 
 interface BatchReceivingItem {
   productId: string
@@ -474,6 +475,7 @@ export async function deleteLot(lotId: string) {
 
 /**
  * Finalize a receiving event (prevent further edits)
+ * Also creates a Bill in QuickBooks Online if QBO is connected
  */
 export async function finalizeReceivingEvent(eventId: string) {
   const session = await auth()
@@ -487,33 +489,146 @@ export async function finalizeReceivingEvent(eventId: string) {
   }
 
   try {
-    const event = await prisma.receivingEvent.update({
+    // Fetch the full receiving event with vendor and lots
+    const event = await prisma.receivingEvent.findUnique({
+      where: { id: eventId },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+            qbo_id: true,
+          },
+        },
+        lots: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                qbo_id: true,
+                unit_type: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!event) {
+      throw new Error("Receiving event not found")
+    }
+
+    // Try to create QBO bill if QBO is connected and vendor/product have QBO IDs
+    let qboBillId: string | null = null
+    let qboSyncToken: string | null = null
+    let qboError: string | null = null
+
+    try {
+      const qboStatus = await getQboConnectionStatus()
+      
+      if (qboStatus.connected && event.vendor.qbo_id) {
+        // Check if all products have QBO IDs
+        const allProductsHaveQboId = event.lots.every(
+          lot => lot.product.qbo_id
+        )
+
+        if (allProductsHaveQboId) {
+          // Fetch purchase costs from QBO for each product
+          const lineItems = await Promise.all(
+            event.lots.map(async (lot) => {
+              const product = lot.product
+              if (!product.qbo_id) {
+                throw new Error(`Product ${product.name} missing QBO ID`)
+              }
+
+              // Fetch item from QBO to get purchase cost
+              const qboItem = await fetchQboItemById(product.qbo_id)
+              const unitPrice = qboItem?.PurchaseCost || 0
+
+              return {
+                itemQboId: product.qbo_id,
+                itemName: product.name,
+                quantity: lot.quantity_received,
+                unitPrice: unitPrice,
+              }
+            })
+          )
+
+          // Create bill in QBO
+          const bill = await createQboBill(
+            event.vendor.qbo_id,
+            event.receipt_number,
+            event.received_date,
+            lineItems
+          )
+
+          qboBillId = bill.Id
+          qboSyncToken = bill.SyncToken
+
+          console.log(
+            `✅ Created QBO bill ${bill.Id} for receiving event ${eventId}`
+          )
+        } else {
+          qboError = "Some products are missing QBO IDs. Sync products from QBO first."
+          console.warn(
+            `⚠️  Cannot create QBO bill: ${qboError}`
+          )
+        }
+      } else if (qboStatus.connected && !event.vendor.qbo_id) {
+        qboError = "Vendor is missing QBO ID. Sync vendors from QBO first."
+        console.warn(`⚠️  Cannot create QBO bill: ${qboError}`)
+      }
+    } catch (qboSyncError) {
+      // Don't fail finalization if QBO sync fails - just log the error
+      qboError = qboSyncError instanceof Error 
+        ? qboSyncError.message 
+        : "Unknown QBO sync error"
+      console.error(
+        `❌ Failed to create QBO bill for receiving event ${eventId}:`,
+        qboSyncError
+      )
+    }
+
+    // Update status to FINALIZED and include QBO bill info if created
+    const updatedEvent = await prisma.receivingEvent.update({
       where: { id: eventId },
       data: {
         status: "FINALIZED",
         finalized_at: new Date(),
-      },
+        ...(qboBillId && qboSyncToken ? {
+          qbo_id: qboBillId,
+          qbo_sync_token: qboSyncToken,
+        } : {}),
+      } as any,
       include: {
         vendor: { select: { name: true } },
         lots: { select: { id: true } },
       },
     })
 
-    // Log the finalization
+    // Log the finalization (include QBO sync status)
     await logActivity(
       session.user.id,
       AuditAction.FINALIZE,
       EntityType.RECEIVING_EVENT,
       eventId,
       {
-        vendor: event.vendor.name,
-        lots_count: event.lots.length,
-        summary: `Finalized receiving event for ${event.vendor.name}`,
+        vendor: updatedEvent.vendor.name,
+        lots_count: updatedEvent.lots.length,
+        summary: `Finalized receiving event for ${updatedEvent.vendor.name}`,
+        qbo_bill_id: qboBillId || undefined,
+        qbo_sync_error: qboError || undefined,
       }
     )
 
     revalidatePath("/dashboard/receiving/history")
-    return { success: true }
+    return {
+      success: true,
+      qboBillId: qboBillId || undefined,
+      qboError: qboError || undefined,
+    }
   } catch (error) {
     console.error("Error finalizing receiving event:", error)
     return {

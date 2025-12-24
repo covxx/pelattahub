@@ -110,7 +110,8 @@ async function makeQboRequest(
   
   const response = await oauthClient.makeApiCall({ url, method, body })
   
-  if (response.statusCode !== 200) {
+  // Accept both 200 (OK) and 201 (Created) as success
+  if (response.statusCode !== 200 && response.statusCode !== 201) {
     throw new Error(`QBO API error: ${response.statusCode} - ${response.text}`)
   }
 
@@ -307,6 +308,117 @@ export function mapQboVendorToWms(qboVendor: QboVendor): {
     qbo_id: qboVendor.Id,
     qbo_sync_token: qboVendor.SyncToken,
     active: qboVendor.Active,
+  }
+}
+
+/**
+ * QBO Bill interface
+ */
+export interface QboBill {
+  Id: string
+  SyncToken: string
+  VendorRef: {
+    value: string
+    name: string
+  }
+  TxnDate: string
+  DocNumber?: string
+  Line: Array<{
+    Amount: number
+    DetailType: "ItemBasedExpenseLineDetail"
+    ItemBasedExpenseLineDetail: {
+      ItemRef: {
+        value: string
+        name: string
+      }
+      Qty: number
+      UnitPrice: number
+    }
+  }>
+  TotalAmt: number
+}
+
+/**
+ * Create a Bill in QuickBooks Online from a receiving event
+ * 
+ * @param vendorQboId - The QBO ID of the vendor
+ * @param receiptNumber - Receipt number for the bill document number
+ * @param txnDate - Transaction date (received_date)
+ * @param lineItems - Array of line items with product QBO ID, quantity, and unit price
+ * @returns Created bill with Id and SyncToken
+ */
+export async function createQboBill(
+  vendorQboId: string,
+  receiptNumber: number,
+  txnDate: Date,
+  lineItems: Array<{
+    itemQboId: string
+    itemName: string
+    quantity: number
+    unitPrice: number
+  }>
+): Promise<{ Id: string; SyncToken: string }> {
+  const oauthClient = await getQboClient()
+
+  // Format date as YYYY-MM-DD
+  const formattedDate = txnDate.toISOString().split('T')[0]
+
+  // Build bill line items
+  const billLines = lineItems.map(item => ({
+    Amount: item.quantity * item.unitPrice,
+    DetailType: "ItemBasedExpenseLineDetail" as const,
+    ItemBasedExpenseLineDetail: {
+      ItemRef: {
+        value: item.itemQboId,
+        name: item.itemName,
+      },
+      Qty: item.quantity,
+      UnitPrice: item.unitPrice,
+    },
+  }))
+
+  // Calculate total amount
+  const totalAmt = billLines.reduce((sum, line) => sum + line.Amount, 0)
+
+  // Build bill payload
+  const billPayload = {
+    VendorRef: {
+      value: vendorQboId,
+    },
+    TxnDate: formattedDate,
+    DocNumber: `REC-${receiptNumber}`,
+    Line: billLines,
+    TotalAmt: totalAmt,
+  }
+
+  // Create the bill
+  const result = await makeQboRequest(oauthClient, "bill", "POST", billPayload)
+
+  // Extract bill from response
+  const bill = result.BillResponse?.Bill
+  if (!bill || !bill.Id) {
+    throw new Error(`Failed to create bill in QBO: ${JSON.stringify(result)}`)
+  }
+
+  return {
+    Id: bill.Id,
+    SyncToken: bill.SyncToken,
+  }
+}
+
+/**
+ * Fetch a single item from QBO by ID to get purchase cost
+ */
+export async function fetchQboItemById(itemId: string): Promise<QboItem | null> {
+  const oauthClient = await getQboClient()
+  
+  try {
+    const query = `SELECT * FROM Item WHERE Id = '${itemId}'`
+    const items = await queryQbo(oauthClient, query)
+    return items.length > 0 ? (items[0] as QboItem) : null
+  } catch (error) {
+    console.error(`Error fetching QBO item ${itemId}:`, error)
+    return null
   }
 }
 

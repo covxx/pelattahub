@@ -100,7 +100,7 @@ async function requireAdminOrManager() {
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
     throw new Error("Admin or Manager access required")
   }
   return session
@@ -758,6 +758,149 @@ export async function getQboAuthUrl() {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to generate auth URL",
+    }
+  }
+}
+
+/**
+ * Get receiving events that need QBO sync attention
+ * Returns OPEN events (not finalized) and FINALIZED events without QBO bill ID
+ */
+export async function getReceivingEventsForQboSync() {
+  await requireAdminOrManager()
+
+  try {
+    // Get OPEN receiving events (not finalized yet - won't have QBO bills)
+    const openEvents = await prisma.receivingEvent.findMany({
+      where: {
+        status: "OPEN",
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+            qbo_id: true,
+          },
+        },
+        lots: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                qbo_id: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        received_date: "desc",
+      },
+      take: 50, // Limit to recent 50
+    })
+
+    // Get FINALIZED events without QBO bill ID (sync failed or not attempted)
+    const finalizedWithoutQbo = await prisma.receivingEvent.findMany({
+      where: {
+        status: "FINALIZED",
+        qbo_id: null,
+      } as any,
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+            qbo_id: true,
+          },
+        },
+        lots: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                qbo_id: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        finalized_at: "desc",
+      },
+      take: 50, // Limit to recent 50
+    })
+
+    // Get FINALIZED events with QBO bill ID (successfully synced)
+    const syncedEvents = await prisma.receivingEvent.findMany({
+      where: {
+        status: "FINALIZED",
+        qbo_id: { not: null },
+      } as any,
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+            qbo_id: true,
+          },
+        },
+        lots: {
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: {
+        finalized_at: "desc",
+      },
+      take: 20, // Show recent synced ones
+    })
+
+    return {
+      success: true,
+      open: openEvents.map(event => ({
+        id: event.id,
+        receipt_number: event.receipt_number,
+        received_date: event.received_date,
+        vendor: event.vendor.name,
+        vendor_has_qbo_id: !!event.vendor.qbo_id,
+        lots_count: event.lots.length,
+        all_products_have_qbo_id: event.lots.every(lot => lot.product.qbo_id),
+        status: "OPEN" as const,
+      })),
+      finalizedWithoutQbo: finalizedWithoutQbo.map(event => ({
+        id: event.id,
+        receipt_number: event.receipt_number,
+        received_date: event.received_date,
+        finalized_at: event.finalized_at,
+        vendor: event.vendor.name,
+        vendor_has_qbo_id: !!event.vendor.qbo_id,
+        lots_count: event.lots.length,
+        all_products_have_qbo_id: event.lots.every(lot => lot.product.qbo_id),
+        status: "FINALIZED_NO_SYNC" as const,
+      })),
+      synced: syncedEvents.map(event => ({
+        id: event.id,
+        receipt_number: event.receipt_number,
+        received_date: event.received_date,
+        finalized_at: event.finalized_at,
+        vendor: event.vendor.name,
+        qbo_id: (event as any).qbo_id,
+        lots_count: event.lots.length,
+        status: "SYNCED" as const,
+      })),
+    }
+  } catch (error) {
+    console.error("Error fetching receiving events for QBO sync:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch receiving events",
+      open: [],
+      finalizedWithoutQbo: [],
+      synced: [],
     }
   }
 }

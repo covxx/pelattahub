@@ -15,15 +15,17 @@ import {
   Activity, 
   Settings,
   Link2,
-  ArrowLeft
+  ArrowLeft,
+  TestTube
 } from "lucide-react"
 
 interface AdminSidebarProps {
   isAdmin: boolean
   isManager: boolean
+  isSrjLabs?: boolean
 }
 
-export function AdminSidebar({ isAdmin, isManager }: AdminSidebarProps) {
+export function AdminSidebar({ isAdmin, isManager, isSrjLabs = false }: AdminSidebarProps) {
   const pathname = usePathname()
 
   // Navigation items grouped by category
@@ -41,14 +43,19 @@ export function AdminSidebar({ isAdmin, isManager }: AdminSidebarProps) {
   ]
 
   // Management tools (Admin and Manager)
-  const managementItems = (isAdmin || isManager) ? [
+  const managementItems = (isAdmin || isManager || isSrjLabs) ? [
     { href: "/dashboard/admin/recall", label: "Recall", icon: AlertTriangle },
   ] : []
 
   // Admin only items
-  const adminOnlyItems = isAdmin ? [
+  const adminOnlyItems = (isAdmin || isSrjLabs) ? [
     { href: "/dashboard/admin/logs", label: "System Logs", icon: FileText },
     { href: "/dashboard/admin/health", label: "System Health", icon: Activity },
+  ] : []
+
+  // SRJLABS only items (dev/test tools)
+  const srjLabsItems = isSrjLabs ? [
+    { href: "/dashboard/admin/dev-options", label: "Dev Options", icon: TestTube },
   ] : []
 
   return (
@@ -142,6 +149,23 @@ export function AdminSidebar({ isAdmin, isManager }: AdminSidebarProps) {
               </p>
               <div className="space-y-1">
                 {adminOnlyItems.map((item) => (
+                  <AdminNavLink key={item.href} href={item.href} pathname={pathname}>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </AdminNavLink>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SRJLABS Only */}
+          {srjLabsItems.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                Development
+              </p>
+              <div className="space-y-1">
+                {srjLabsItems.map((item) => (
                   <AdminNavLink key={item.href} href={item.href} pathname={pathname}>
                     <item.icon className="h-4 w-4" />
                     <span>{item.label}</span>

@@ -143,8 +143,8 @@ export function LotRow({ lot, daysLeft, expiryStatus }: LotRowProps) {
       }
 
       const productForLabel = {
-        name: lot.product.name,
-        gtin: lot.product.gtin,
+          name: lot.product.name,
+          gtin: lot.product.gtin,
         variety: lot.product.variety || null
       }
 

@@ -10,7 +10,7 @@ async function requireAdminOrManager() {
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
     throw new Error("Admin or Manager access required")
   }
   return session
@@ -44,7 +44,7 @@ export async function createUser(data: {
   name: string
   email: string
   password: string
-  role: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER"
+  role: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER" | "SRJLABS"
 }) {
   await requireAdminOrManager()
 
@@ -97,7 +97,7 @@ export async function updateUser(
   data: {
     name?: string
     email?: string
-    role?: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER"
+    role?: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER" | "SRJLABS"
   }
 ) {
   await requireAdminOrManager()

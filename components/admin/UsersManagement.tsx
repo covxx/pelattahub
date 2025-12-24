@@ -28,12 +28,13 @@ import {
   deleteUser,
   resetUserPassword,
 } from "@/app/actions/admin/users"
+import { Role } from "@prisma/client"
 
 interface User {
   id: string
   name: string | null
   email: string
-  role: "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER"
+  role: Role
   createdAt: Date | string
   updatedAt: Date | string
 }
@@ -53,7 +54,7 @@ export function UsersManagement({ users }: UsersManagementProps) {
     name: "",
     email: "",
     password: "",
-    role: "RECEIVER" as "ADMIN" | "RECEIVER" | "PACKER" | "MANAGER",
+    role: "RECEIVER" as Role,
   })
   const [newPassword, setNewPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -262,10 +263,11 @@ export function UsersManagement({ users }: UsersManagementProps) {
                   <SelectItem value="RECEIVER">Receiver</SelectItem>
                   <SelectItem value="PACKER">Packer</SelectItem>
                   <SelectItem value="MANAGER">Manager</SelectItem>
+                  <SelectItem value="SRJLABS">SRJLabs (Super Admin)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                ADMIN: Full system access. RECEIVER: Receiving operations. PACKER: Order fulfillment. MANAGER: Receiving and picking operations.
+                ADMIN: Full system access. RECEIVER: Receiving operations. PACKER: Order fulfillment. MANAGER: Receiving and picking operations. SRJLABS: Full access including dev tools.
               </p>
             </div>
 

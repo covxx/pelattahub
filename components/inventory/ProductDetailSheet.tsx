@@ -89,14 +89,14 @@ export function ProductDetailSheet({
     try {
       // Prepare lot data for case label PDF
       const lotForLabel = {
-        lot_number: lot.lot_number,
-        received_date: lot.received_date,
+            lot_number: lot.lot_number,
+            received_date: lot.received_date,
         expiry_date: lot.expiry_date
       }
 
       const productForLabel = {
-        name: product.name,
-        gtin: product.gtin,
+            name: product.name,
+            gtin: product.gtin,
         variety: product.variety || null
       }
 
