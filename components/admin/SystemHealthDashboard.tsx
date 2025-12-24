@@ -95,7 +95,7 @@ export function SystemHealthDashboard({ initialHealth }: SystemHealthDashboardPr
           <p className="text-muted-foreground">
             Real-time system health metrics and diagnostics
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-base font-medium text-muted-foreground mt-2">
             PalettaHub v{versionInfo.version} "{versionInfo.name}"
             {versionInfo.commitId !== 'dev' && (
               <span className="ml-2 font-mono">({versionInfo.commitId})</span>
