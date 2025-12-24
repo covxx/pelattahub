@@ -14,7 +14,8 @@ import {
   Search, 
   Activity, 
   Settings,
-  Link2
+  Link2,
+  ArrowLeft
 } from "lucide-react"
 
 interface AdminSidebarProps {
@@ -63,6 +64,21 @@ export function AdminSidebar({ isAdmin, isManager }: AdminSidebarProps) {
 
         {/* Navigation Groups */}
         <nav className="space-y-6">
+          {/* Back to Main Dashboard */}
+          <div>
+            <Link
+              href="/dashboard"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                "group border-b border-border pb-4 mb-2"
+              )}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Main Dashboard</span>
+            </Link>
+          </div>
+
           {/* Dashboard Link */}
           <div>
             <AdminNavLink href="/dashboard/admin" pathname={pathname} exact>
