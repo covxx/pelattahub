@@ -21,11 +21,9 @@ COPY . .
 # Get git commit ID (if available) and set as build arg
 # This will be available as NEXT_PUBLIC_COMMIT_ID during build
 ARG COMMIT_ID
+# Try to get commit ID from git if not provided as build arg
 RUN if [ -z "$COMMIT_ID" ] && [ -d .git ]; then \
-      COMMIT_ID=$(git rev-parse --short HEAD 2>/dev/null || echo "dev"); \
-    fi; \
-    if [ -n "$COMMIT_ID" ]; then \
-      echo "NEXT_PUBLIC_COMMIT_ID=$COMMIT_ID" >> .env.local; \
+      COMMIT_ID=$(git rev-parse --short HEAD 2>/dev/null || echo ""); \
     fi
 
 # Generate Prisma Client
@@ -35,8 +33,10 @@ RUN npx prisma@6.19.0 generate
 
 # Build Next.js application
 ENV NEXT_TELEMETRY_DISABLED=1
-# Set commit ID as env var for build if available
-RUN if [ -f .env.local ]; then export $(cat .env.local | xargs); fi && npm run build
+# Set commit ID as environment variable for Next.js build (NEXT_PUBLIC_ prefix makes it available client-side)
+ARG COMMIT_ID
+ENV NEXT_PUBLIC_COMMIT_ID=${COMMIT_ID:-}
+RUN npm run build
 
 # Stage 3: Runner
 FROM node:20-alpine AS runner
