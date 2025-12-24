@@ -82,23 +82,35 @@ if [ "$SKIP_WAIT" = false ]; then
     echo -e "${YELLOW}⚠️  Container may not be fully ready, proceeding anyway...${NC}"
   fi
 
-  # Wait for database service to be ready
-  echo -e "${YELLOW}⏳ Waiting for database service to be ready...${NC}"
+  # Wait for database to be accessible
+  # Check if db service exists in docker-compose, if not assume external DB
+  echo -e "${YELLOW}⏳ Checking database connectivity...${NC}"
   DB_READY=false
-  for i in {1..10}; do
-    if docker compose exec -T db pg_isready -U wms >/dev/null 2>&1 2>/dev/null || \
-       docker compose ps db 2>/dev/null | grep -q "Up"; then
-      DB_READY=true
-      echo -e "${GREEN}✅ Database service is ready${NC}"
-      break
-    fi
-    if [ $i -lt 10 ]; then
-      sleep 2
-    fi
-  done
+  
+  # Check if db service exists in docker-compose
+  if docker compose ps db >/dev/null 2>&1; then
+    # Internal db service exists - wait for it to be ready
+    echo -e "${BLUE}   Found db service in docker-compose, waiting for it...${NC}"
+    for i in {1..10}; do
+      if docker compose exec -T db pg_isready -U wms >/dev/null 2>&1; then
+        DB_READY=true
+        echo -e "${GREEN}✅ Database service is ready${NC}"
+        break
+      fi
+      if [ $i -lt 10 ]; then
+        sleep 2
+      fi
+    done
+  else
+    # No db service - assume external database (already running)
+    echo -e "${BLUE}   No db service found, assuming external database${NC}"
+    echo -e "${BLUE}   Skipping wait - external database should already be ready${NC}"
+    DB_READY=true  # Assume ready since it's external
+  fi
 
   if [ "$DB_READY" = false ]; then
-    echo -e "${YELLOW}⚠️  Database service may not be fully ready, proceeding anyway...${NC}"
+    echo -e "${YELLOW}⚠️  Database service may not be fully ready, but proceeding with migration attempt...${NC}"
+    echo -e "${YELLOW}   (migrate deploy will handle connection errors gracefully)${NC}"
   fi
 fi
 
