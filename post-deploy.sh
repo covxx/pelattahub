@@ -246,24 +246,33 @@ sleep 3
 echo -e "${YELLOW}📊 Checking service status...${NC}"
 docker compose ps
 
-# Check if services are running - use multiple methods for reliability
-SERVICES_UP=$(docker compose ps --format json 2>/dev/null | jq -r '.[] | select(.State == "running") | .Name' 2>/dev/null | wc -l | tr -dc '0-9')
-SERVICES_UP=${SERVICES_UP//[!0-9]/}
-if [ -z "$SERVICES_UP" ]; then SERVICES_UP=0; fi
+# Check if services are running - use simple method that's more reliable
+SERVICES_UP=0
 
-# Alternative check: count containers with "Up" status
-if [ "${SERVICES_UP:-0}" -eq 0 ] 2>/dev/null; then
-  SERVICES_UP=$(docker compose ps 2>/dev/null | grep -c "Up" | tr -dc '0-9')
-  SERVICES_UP=${SERVICES_UP//[!0-9]/}
-  if [ -z "$SERVICES_UP" ]; then SERVICES_UP=0; fi
+# Method 1: Count "Up" in docker compose ps output
+UP_COUNT=$(docker compose ps 2>/dev/null | grep -c "Up" || echo "0")
+if [ -n "$UP_COUNT" ] && [ "$UP_COUNT" -gt 0 ] 2>/dev/null; then
+  SERVICES_UP=$UP_COUNT
 fi
 
-# Final check: verify container exists and is running
-if [ "${SERVICES_UP:-0}" -eq 0 ] 2>/dev/null; then
-  # Check if wms-app container exists and is running
-  if docker ps --filter "name=wms-app" --format "{{.Status}}" | grep -q "Up"; then
+# Method 2: If still 0, check if wms-app container is running
+if [ "$SERVICES_UP" -eq 0 ] 2>/dev/null; then
+  if docker ps --filter "name=wms-app" --format "{{.Status}}" 2>/dev/null | grep -q "Up"; then
     SERVICES_UP=1
   fi
+fi
+
+# Method 3: Final fallback - check if any containers are running
+if [ "$SERVICES_UP" -eq 0 ] 2>/dev/null; then
+  RUNNING_CONTAINERS=$(docker ps --filter "name=wms-" --format "{{.Names}}" 2>/dev/null | wc -l)
+  if [ -n "$RUNNING_CONTAINERS" ] && [ "$RUNNING_CONTAINERS" -gt 0 ] 2>/dev/null; then
+    SERVICES_UP=$RUNNING_CONTAINERS
+  fi
+fi
+
+# Ensure SERVICES_UP is a number
+if ! [ "$SERVICES_UP" -eq "$SERVICES_UP" ] 2>/dev/null; then
+  SERVICES_UP=0
 fi
 
 if [ "$SERVICES_UP" -eq 0 ]; then
