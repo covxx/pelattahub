@@ -3,6 +3,11 @@
 # Post-Deployment Script for Production Server
 # Run this script on the production server after deploy-remote.sh completes
 # Usage: ./post-deploy.sh
+# 
+# Environment Variables:
+#   RUN_MIGRATIONS - Set to "true" to run migrations during post-deploy (default: false)
+#                    Migrations are separated to prevent hanging. Run separately with:
+#                    ./scripts/run-migrations.sh
 
 set -euo pipefail
 
@@ -286,111 +291,34 @@ echo -e "${GREEN}✅ Services are running (${SERVICES_UP} service(s) up)${NC}"
 echo ""
 
 # =============================================================================
-# 7. Check and Run Database Migrations
+# 7. Database Migrations (Optional - can be run separately)
 # =============================================================================
-echo -e "${YELLOW}🗄️  Checking database migration status...${NC}"
+# Migrations are now separated to prevent post-deploy from hanging
+# Set RUN_MIGRATIONS=true to run migrations during post-deploy
+# Otherwise, run migrations separately: ./scripts/run-migrations.sh
 
-# Wait for the app container to be fully ready before attempting migrations
-echo -e "${BLUE}   Waiting for app container to be ready...${NC}"
-MAX_WAIT=30
-WAIT_COUNT=0
-CONTAINER_READY=false
-
-while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-  # Check if container is running and can execute commands
-  if docker compose exec -T app sh -c "echo 'ready'" >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ Container is ready${NC}"
-    CONTAINER_READY=true
-    break
-  fi
-  WAIT_COUNT=$((WAIT_COUNT + 1))
-  if [ $((WAIT_COUNT % 5)) -eq 0 ]; then
-    echo -e "${YELLOW}   Still waiting... (${WAIT_COUNT}s/${MAX_WAIT}s)${NC}"
-  fi
-  sleep 1
-done
-
-if [ "$CONTAINER_READY" = false ]; then
-  echo -e "${YELLOW}⚠️  Container may not be fully ready, attempting migration check anyway...${NC}"
-fi
-
-# Check database connectivity first - wait for DB service to be ready
-echo -e "${BLUE}   Waiting for database service to be ready...${NC}"
-DB_READY=false
-for i in {1..10}; do
-  if docker compose exec -T db pg_isready -U wms >/dev/null 2>&1 || \
-     docker compose ps db 2>/dev/null | grep -q "Up"; then
-    DB_READY=true
-    echo -e "${GREEN}✅ Database service is ready${NC}"
-    break
-  fi
-  if [ $i -lt 10 ]; then
-    sleep 2
-  fi
-done
-
-if [ "$DB_READY" = false ]; then
-  echo -e "${YELLOW}⚠️  Database service may not be fully ready, proceeding anyway...${NC}"
-fi
-
-# Skip status check - just run migrate deploy directly (it's idempotent)
-# This prevents hanging on status checks that can get stuck
-echo -e "${BLUE}   Applying database migrations (migrate deploy is idempotent)...${NC}"
-echo -e "${YELLOW}   Note: Skipping status check to prevent hanging. migrate deploy will only apply pending migrations.${NC}"
-
-MIGRATION_SUCCESS=false
-MIGRATION_OUTPUT=""
-
-if command -v timeout >/dev/null 2>&1; then
-  echo -e "${BLUE}   Running migrations (with 120s timeout)...${NC}"
-  MIGRATION_OUTPUT=$(timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" 2>&1)
-  EXIT_CODE=$?
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+  echo -e "${YELLOW}🗄️  Running database migrations (RUN_MIGRATIONS=true)...${NC}"
   
-  if [ $EXIT_CODE -eq 0 ]; then
-    MIGRATION_SUCCESS=true
-  elif [ $EXIT_CODE -eq 124 ]; then
-    echo -e "${RED}❌ Migration deploy timed out after 120 seconds${NC}"
+  # Use the separate migration script with a shorter timeout to prevent hanging
+  if [ -f "scripts/run-migrations.sh" ]; then
+    echo -e "${BLUE}   Using separate migration script...${NC}"
+    if ./scripts/run-migrations.sh --timeout=60; then
+      echo -e "${GREEN}✅ Migrations completed${NC}"
+    else
+      echo -e "${YELLOW}⚠️  Migration script failed or timed out${NC}"
+      echo -e "${YELLOW}   You can run migrations separately: ./scripts/run-migrations.sh${NC}"
+      echo -e "${YELLOW}   Continuing with deployment...${NC}"
+    fi
   else
-    echo -e "${RED}❌ Migration deploy failed (exit code: $EXIT_CODE)${NC}"
+    echo -e "${YELLOW}⚠️  Migration script not found, skipping migrations${NC}"
+    echo -e "${YELLOW}   Run migrations manually: ./scripts/run-migrations.sh${NC}"
   fi
 else
-  echo -e "${BLUE}   Running migrations (no timeout available)...${NC}"
-  MIGRATION_OUTPUT=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" 2>&1)
-  EXIT_CODE=$?
-  
-  if [ $EXIT_CODE -eq 0 ]; then
-    MIGRATION_SUCCESS=true
-  else
-    echo -e "${RED}❌ Migration deploy failed (exit code: $EXIT_CODE)${NC}"
-  fi
+  echo -e "${YELLOW}⏭️  Skipping database migrations (set RUN_MIGRATIONS=true to enable)${NC}"
+  echo -e "${BLUE}   To run migrations separately: ./scripts/run-migrations.sh${NC}"
+  echo -e "${BLUE}   Or set RUN_MIGRATIONS=true and re-run post-deploy.sh${NC}"
 fi
-
-if [ "$MIGRATION_SUCCESS" = true ]; then
-  echo -e "${GREEN}✅ Migrations completed successfully${NC}"
-  # Show any warnings but not full output (too verbose)
-  if echo "$MIGRATION_OUTPUT" | grep -q "warn\|WARN"; then
-    echo -e "${YELLOW}⚠️  Migration warnings:${NC}"
-    echo "$MIGRATION_OUTPUT" | grep -i "warn" | head -3
-  fi
-else
-  echo -e "${RED}❌ Migration failed!${NC}"
-  echo ""
-  echo -e "${YELLOW}Migration output:${NC}"
-  echo "$MIGRATION_OUTPUT"
-  echo ""
-  echo -e "${YELLOW}Troubleshooting:${NC}"
-  echo "  • Check if migration files are missing: docker compose exec app ls -la prisma/migrations/"
-  echo "  • Check Prisma logs above for specific error"
-  echo "  • You may need to fix or remove corrupted migration directories"
-  echo ""
-  echo -e "${YELLOW}Application logs:${NC}"
-  docker compose logs --tail=20 app
-  exit 1
-fi
-
-# Note: Status check removed to prevent hanging
-# migrate deploy is idempotent - it only applies pending migrations
-# To check status manually, run: docker compose exec app npx prisma migrate status
 echo ""
 
 # =============================================================================
@@ -521,7 +449,11 @@ echo ""
 echo -e "${GREEN}Deployment Status:${NC}"
 echo "  • Image: Loaded and verified"
 echo "  • Services: Running with latest image"
-echo "  • Migrations: Completed"
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+  echo "  • Migrations: Completed (if enabled)"
+else
+  echo "  • Migrations: Skipped (run separately: ./scripts/run-migrations.sh)"
+fi
 echo "  • Health Check: Passed"
 if maintenance_exists; then
   echo "  • Maintenance Flag: PRESENT at $MAINTENANCE_PATH (requires manual removal)"
@@ -533,5 +465,7 @@ echo -e "${BLUE}Useful commands:${NC}"
 echo "  • View logs: docker compose logs -f app"
 echo "  • Check status: docker compose ps"
 echo "  • Restart app: docker compose restart app"
+echo "  • Run migrations: ./scripts/run-migrations.sh"
+echo "  • Check migration status: docker compose exec app npx prisma migrate status"
 echo ""
 
