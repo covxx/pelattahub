@@ -339,31 +339,51 @@ echo -e "${BLUE}   Applying database migrations (migrate deploy is idempotent)..
 echo -e "${YELLOW}   Note: Skipping status check to prevent hanging. migrate deploy will only apply pending migrations.${NC}"
 
 MIGRATION_SUCCESS=false
+MIGRATION_OUTPUT=""
+
 if command -v timeout >/dev/null 2>&1; then
   echo -e "${BLUE}   Running migrations (with 120s timeout)...${NC}"
-  if timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+  MIGRATION_OUTPUT=$(timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" 2>&1)
+  EXIT_CODE=$?
+  
+  if [ $EXIT_CODE -eq 0 ]; then
     MIGRATION_SUCCESS=true
+  elif [ $EXIT_CODE -eq 124 ]; then
+    echo -e "${RED}❌ Migration deploy timed out after 120 seconds${NC}"
   else
-    EXIT_CODE=$?
-    if [ $EXIT_CODE -eq 124 ]; then
-      echo -e "${RED}❌ Migration deploy timed out after 120 seconds${NC}"
-    else
-      echo -e "${RED}❌ Migration deploy failed (exit code: $EXIT_CODE)${NC}"
-    fi
+    echo -e "${RED}❌ Migration deploy failed (exit code: $EXIT_CODE)${NC}"
   fi
 else
   echo -e "${BLUE}   Running migrations (no timeout available)...${NC}"
-  if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+  MIGRATION_OUTPUT=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" 2>&1)
+  EXIT_CODE=$?
+  
+  if [ $EXIT_CODE -eq 0 ]; then
     MIGRATION_SUCCESS=true
   else
-    echo -e "${RED}❌ Migration deploy failed${NC}"
+    echo -e "${RED}❌ Migration deploy failed (exit code: $EXIT_CODE)${NC}"
   fi
 fi
 
 if [ "$MIGRATION_SUCCESS" = true ]; then
   echo -e "${GREEN}✅ Migrations completed successfully${NC}"
+  # Show any warnings but not full output (too verbose)
+  if echo "$MIGRATION_OUTPUT" | grep -q "warn\|WARN"; then
+    echo -e "${YELLOW}⚠️  Migration warnings:${NC}"
+    echo "$MIGRATION_OUTPUT" | grep -i "warn" | head -3
+  fi
 else
-  echo -e "${RED}❌ Migration failed! Check logs:${NC}"
+  echo -e "${RED}❌ Migration failed!${NC}"
+  echo ""
+  echo -e "${YELLOW}Migration output:${NC}"
+  echo "$MIGRATION_OUTPUT"
+  echo ""
+  echo -e "${YELLOW}Troubleshooting:${NC}"
+  echo "  • Check if migration files are missing: docker compose exec app ls -la prisma/migrations/"
+  echo "  • Check Prisma logs above for specific error"
+  echo "  • You may need to fix or remove corrupted migration directories"
+  echo ""
+  echo -e "${YELLOW}Application logs:${NC}"
   docker compose logs --tail=20 app
   exit 1
 fi
