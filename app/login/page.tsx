@@ -115,7 +115,7 @@ export default function LoginPage() {
 
           {/* Version Info */}
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-center text-muted-foreground">
+            <p className="text-base font-medium text-center text-muted-foreground">
               PalettaHub v{versionInfo.version} "{versionInfo.name}"
               {versionInfo.commitId !== 'dev' && (
                 <span className="ml-2 font-mono">({versionInfo.commitId})</span>
