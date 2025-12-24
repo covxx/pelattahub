@@ -273,7 +273,7 @@ if [ "$SERVICES_UP" -eq 0 ]; then
   exit 1
 fi
 
-echo -e "${GREEN}✅ Services are running${NC}"
+echo -e "${GREEN}✅ Services are running (${SERVICES_UP} service(s) up)${NC}"
 echo ""
 
 # =============================================================================
@@ -285,10 +285,13 @@ echo -e "${YELLOW}🗄️  Checking database migration status...${NC}"
 echo -e "${BLUE}   Waiting for app container to be ready...${NC}"
 MAX_WAIT=30
 WAIT_COUNT=0
+CONTAINER_READY=false
+
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-  # Check if container is running and healthy
+  # Check if container is running and can execute commands
   if docker compose exec -T app sh -c "echo 'ready'" >/dev/null 2>&1; then
     echo -e "${GREEN}✅ Container is ready${NC}"
+    CONTAINER_READY=true
     break
   fi
   WAIT_COUNT=$((WAIT_COUNT + 1))
@@ -298,14 +301,20 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
   sleep 1
 done
 
-if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+if [ "$CONTAINER_READY" = false ]; then
   echo -e "${YELLOW}⚠️  Container may not be fully ready, attempting migration check anyway...${NC}"
 fi
 
 # First, check if there are pending migrations
 echo -e "${BLUE}   Checking for pending migrations...${NC}"
-# Use timeout to prevent hanging
-MIGRATION_STATUS=$(timeout 30 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+
+# Check if timeout command is available, use it if available
+if command -v timeout >/dev/null 2>&1; then
+  MIGRATION_STATUS=$(timeout 30 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+else
+  # Fallback: run without timeout (should still work, but may hang)
+  MIGRATION_STATUS=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+fi
 
 if echo "$MIGRATION_STATUS" | grep -q "Database schema is up to date"; then
   echo -e "${GREEN}✅ Database schema is up to date - no migrations needed${NC}"
@@ -315,13 +324,32 @@ elif echo "$MIGRATION_STATUS" | grep -q "following migration have not yet been a
   echo ""
   echo -e "${YELLOW}   Applying pending migrations...${NC}"
   
-  # Run migrations (with timeout)
-  if timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+  # Run migrations (with timeout if available)
+  echo -e "${YELLOW}   Applying pending migrations...${NC}"
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+      MIGRATION_SUCCESS=true
+    else
+      MIGRATION_SUCCESS=false
+    fi
+  else
+    if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+      MIGRATION_SUCCESS=true
+    else
+      MIGRATION_SUCCESS=false
+    fi
+  fi
+  
+  if [ "$MIGRATION_SUCCESS" = true ]; then
     echo -e "${GREEN}✅ Migrations applied successfully${NC}"
     
     # Verify migrations were applied
     echo -e "${BLUE}   Verifying migration status...${NC}"
-    FINAL_STATUS=$(timeout 30 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+    if command -v timeout >/dev/null 2>&1; then
+      FINAL_STATUS=$(timeout 30 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+    else
+      FINAL_STATUS=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+    fi
     if echo "$FINAL_STATUS" | grep -q "Database schema is up to date"; then
       echo -e "${GREEN}✅ Database schema verified as up to date${NC}"
     else
@@ -338,8 +366,22 @@ elif echo "$MIGRATION_STATUS" | grep -q "ERROR\|error\|Error"; then
   echo "   Status output: $MIGRATION_STATUS"
   echo ""
   
-  # Try to run migrations anyway (with timeout)
-  if timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+  # Try to run migrations anyway (with timeout if available)
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+      MIGRATION_SUCCESS=true
+    else
+      MIGRATION_SUCCESS=false
+    fi
+  else
+    if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+      MIGRATION_SUCCESS=true
+    else
+      MIGRATION_SUCCESS=false
+    fi
+  fi
+  
+  if [ "$MIGRATION_SUCCESS" = true ]; then
     echo -e "${GREEN}✅ Migrations completed${NC}"
   else
     echo -e "${RED}❌ Migration failed! Check logs:${NC}"
