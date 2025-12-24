@@ -71,6 +71,36 @@ export async function clearProducts() {
 }
 
 /**
+ * Clear all products and reimport from QBO with proper GTIN generation
+ */
+export async function clearAndReimportProducts() {
+  await requireSrjLabs()
+
+  try {
+    // Clear all products
+    const deletedCount = await prisma.product.deleteMany({})
+    
+    // Reimport from QBO (this will use the new GTIN generation)
+    const { importQboItems } = await import("@/app/actions/qbo-sync")
+    const importResult = await importQboItems()
+    
+    revalidatePath("/dashboard/admin/dev-options")
+    return { 
+      success: importResult.success, 
+      deleted: deletedCount.count,
+      imported: importResult.imported || 0,
+      updated: importResult.updated || 0,
+      error: importResult.error
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error"
+    }
+  }
+}
+
+/**
  * Clear all vendors
  */
 export async function clearVendors() {

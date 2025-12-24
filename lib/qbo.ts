@@ -262,11 +262,11 @@ export function mapQboCustomerToWms(qboCustomer: QboCustomer): {
 
 /**
  * Map QBO Item to WMS Product format
+ * Note: GTIN generation is handled in the import functions to ensure uniqueness
  */
 export function mapQboItemToWms(qboItem: QboItem): {
   name: string
   sku: string
-  gtin: string
   description?: string
   qbo_id: string
   qbo_sync_token: string
@@ -274,14 +274,9 @@ export function mapQboItemToWms(qboItem: QboItem): {
   // Use SKU from QBO, or generate from Name if missing
   const sku = qboItem.Sku || qboItem.Name.replace(/\s+/g, "-").toUpperCase().substring(0, 50)
 
-  // Generate GTIN from SKU (placeholder - in production, this should come from QBO or be mapped)
-  // For now, pad SKU to 14 digits for GTIN format
-  const gtin = sku.padEnd(14, "0").substring(0, 14)
-
   return {
     name: qboItem.Name,
     sku,
-    gtin,
     description: qboItem.Description,
     qbo_id: qboItem.Id,
     qbo_sync_token: qboItem.SyncToken,

@@ -15,6 +15,7 @@ import {
   getQboConnectionStatus as getConnectionStatus,
   fetchQboByQuery,
 } from "@/lib/qbo"
+import { isValidGTIN, generateUniqueGTIN } from "@/lib/gtin"
 
 /**
  * Resolve a valid system user ID for audit logging
@@ -198,6 +199,12 @@ export async function importQboItems() {
       }
     }
 
+    // Get GS1 prefix for GTIN generation
+    const gs1Setting = await prisma.systemSetting.findUnique({
+      where: { key: "gs1_prefix" },
+    })
+    const gs1Prefix = gs1Setting?.value || "000000"
+
     let imported = 0
     let updated = 0
     const errors: string[] = []
@@ -213,13 +220,25 @@ export async function importQboItems() {
         })
 
         if (existing) {
-          // Update existing product
+          // Update existing product (keep existing GTIN if valid, otherwise regenerate)
+          const shouldRegenerateGTIN = !isValidGTIN(existing.gtin)
+          const gtin = shouldRegenerateGTIN
+            ? await generateUniqueGTIN(
+                gs1Prefix,
+                existing.id,
+                async (gtin) => {
+                  const exists = await prisma.product.findUnique({ where: { gtin } })
+                  return exists !== null && exists.id !== existing.id
+                }
+              )
+            : existing.gtin
+
           await prisma.product.update({
             where: { id: existing.id },
             data: {
               name: wmsData.name,
               sku: wmsData.sku,
-              gtin: wmsData.gtin,
+              gtin,
               description: wmsData.description,
               qbo_sync_token: wmsData.qbo_sync_token,
             } as any,
@@ -238,24 +257,22 @@ export async function importQboItems() {
             continue
           }
 
-          // Check if GTIN already exists (to avoid duplicate GTIN constraint violation)
-          const gtinExists = await prisma.product.findUnique({
-            where: { gtin: wmsData.gtin },
-          })
-
-          if (gtinExists) {
-            errors.push(
-              `GTIN ${wmsData.gtin} already exists for product ${gtinExists.name} (${gtinExists.sku}). Skipping ${qboItem.Name}`
-            )
-            continue
-          }
+          // Generate unique GTIN for new product
+          const gtin = await generateUniqueGTIN(
+            gs1Prefix,
+            qboItem.Id, // Use QBO ID as seed for GTIN generation
+            async (gtin) => {
+              const exists = await prisma.product.findUnique({ where: { gtin } })
+              return exists !== null
+            }
+          )
 
           // Create new product
           await prisma.product.create({
             data: {
               name: wmsData.name,
               sku: wmsData.sku,
-              gtin: wmsData.gtin,
+              gtin,
               description: wmsData.description,
               default_origin_country: "USA", // Default value
               unit_type: "CASE", // Default value

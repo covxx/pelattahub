@@ -679,22 +679,6 @@ async function performQboInvoiceSync(actorUserId: string) {
 
     revalidatePath("/dashboard/admin/integrations/qbo")
     await setLastSyncTimestamp("invoices", new Date())
-    
-    // Build success message
-    const messageParts: string[] = []
-    if (imported > 0) {
-      messageParts.push(`${imported} invoice${imported === 1 ? '' : 's'} imported`)
-    }
-    if (skipped.length > 0) {
-      messageParts.push(`${skipped.length} invoice${skipped.length === 1 ? '' : 's'} skipped`)
-    }
-    if (errors.length > 0) {
-      messageParts.push(`${errors.length} error${errors.length === 1 ? '' : 's'} occurred`)
-    }
-    const message = messageParts.length > 0 
-      ? messageParts.join(', ')
-      : `Processed ${qboInvoices.length} invoice${qboInvoices.length === 1 ? '' : 's'}`
-    
     return {
       success: true,
       imported,
@@ -703,7 +687,6 @@ async function performQboInvoiceSync(actorUserId: string) {
       skippedDetails: skipped,
       invoiceIdsFound: invoiceIds,
       errors: errors.length > 0 ? errors : undefined,
-      message,
     }
   } catch (error) {
     console.error("Error importing QBO invoices:", error)
