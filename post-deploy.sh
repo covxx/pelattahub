@@ -246,7 +246,38 @@ echo ""
 sleep 3
 
 # =============================================================================
-# 6. Check Service Status
+# 6. Database Migrations (Optional - run first to prevent hanging)
+# =============================================================================
+# Migrations are now separated to prevent post-deploy from hanging
+# Set RUN_MIGRATIONS=true to run migrations during post-deploy
+# Otherwise, run migrations separately: ./scripts/run-migrations.sh
+
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+  echo -e "${YELLOW}🗄️  Running database migrations first (RUN_MIGRATIONS=true)...${NC}"
+  
+  # Use the separate migration script with a shorter timeout to prevent hanging
+  if [ -f "scripts/run-migrations.sh" ]; then
+    echo -e "${BLUE}   Using separate migration script...${NC}"
+    if ./scripts/run-migrations.sh --timeout=30; then
+      echo -e "${GREEN}✅ Migrations completed${NC}"
+    else
+      echo -e "${YELLOW}⚠️  Migration script failed or timed out${NC}"
+      echo -e "${YELLOW}   You can run migrations separately: ./scripts/run-migrations.sh${NC}"
+      echo -e "${YELLOW}   Continuing with deployment...${NC}"
+    fi
+  else
+    echo -e "${YELLOW}⚠️  Migration script not found, skipping migrations${NC}"
+    echo -e "${YELLOW}   Run migrations manually: ./scripts/run-migrations.sh${NC}"
+  fi
+else
+  echo -e "${YELLOW}⏭️  Skipping database migrations (set RUN_MIGRATIONS=true to enable)${NC}"
+  echo -e "${BLUE}   To run migrations separately: ./scripts/run-migrations.sh${NC}"
+  echo -e "${BLUE}   Or set RUN_MIGRATIONS=true and re-run post-deploy.sh${NC}"
+fi
+echo ""
+
+# =============================================================================
+# 7. Check Service Status
 # =============================================================================
 echo -e "${YELLOW}📊 Checking service status...${NC}"
 docker compose ps
@@ -288,37 +319,6 @@ if [ "$SERVICES_UP" -eq 0 ]; then
 fi
 
 echo -e "${GREEN}✅ Services are running (${SERVICES_UP} service(s) up)${NC}"
-echo ""
-
-# =============================================================================
-# 7. Database Migrations (Optional - can be run separately)
-# =============================================================================
-# Migrations are now separated to prevent post-deploy from hanging
-# Set RUN_MIGRATIONS=true to run migrations during post-deploy
-# Otherwise, run migrations separately: ./scripts/run-migrations.sh
-
-if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
-  echo -e "${YELLOW}🗄️  Running database migrations (RUN_MIGRATIONS=true)...${NC}"
-  
-  # Use the separate migration script with a shorter timeout to prevent hanging
-  if [ -f "scripts/run-migrations.sh" ]; then
-    echo -e "${BLUE}   Using separate migration script...${NC}"
-    if ./scripts/run-migrations.sh --timeout=60; then
-      echo -e "${GREEN}✅ Migrations completed${NC}"
-    else
-      echo -e "${YELLOW}⚠️  Migration script failed or timed out${NC}"
-      echo -e "${YELLOW}   You can run migrations separately: ./scripts/run-migrations.sh${NC}"
-      echo -e "${YELLOW}   Continuing with deployment...${NC}"
-    fi
-  else
-    echo -e "${YELLOW}⚠️  Migration script not found, skipping migrations${NC}"
-    echo -e "${YELLOW}   Run migrations manually: ./scripts/run-migrations.sh${NC}"
-  fi
-else
-  echo -e "${YELLOW}⏭️  Skipping database migrations (set RUN_MIGRATIONS=true to enable)${NC}"
-  echo -e "${BLUE}   To run migrations separately: ./scripts/run-migrations.sh${NC}"
-  echo -e "${BLUE}   Or set RUN_MIGRATIONS=true and re-run post-deploy.sh${NC}"
-fi
 echo ""
 
 # =============================================================================

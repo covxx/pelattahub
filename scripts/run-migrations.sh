@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-TIMEOUT="${1:-120}"
+TIMEOUT="${1:-30}"
 SKIP_WAIT=false
 
 # Parse arguments
@@ -32,7 +32,7 @@ for arg in "$@"; do
       echo "Usage: $0 [--timeout=SECONDS] [--skip-wait]"
       echo ""
       echo "Options:"
-      echo "  --timeout=SECONDS  Set timeout for migration command (default: 120)"
+      echo "  --timeout=SECONDS  Set timeout for migration command (default: 30)"
       echo "  --skip-wait        Skip waiting for container/database to be ready"
       echo ""
       exit 0
@@ -101,6 +101,13 @@ if [ "$SKIP_WAIT" = false ]; then
     echo -e "${YELLOW}⚠️  Database service may not be fully ready, proceeding anyway...${NC}"
   fi
 fi
+
+# Generate Prisma client first (required for migrations)
+echo -e "${BLUE}⚙️  Generating Prisma client...${NC}"
+if ! docker compose exec -T app sh -c "npx --yes prisma@6.19.0 generate" >/dev/null 2>&1; then
+  echo -e "${YELLOW}⚠️  Prisma generate failed, but continuing with migrations...${NC}"
+fi
+echo ""
 
 # Run migrations
 echo -e "${BLUE}🔄 Running database migrations...${NC}"
