@@ -9,7 +9,8 @@ async function requireAdminOrManager() {
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
+  const role = session.user.role as string
+  if (!["ADMIN", "MANAGER", "SRJLABS"].includes(role)) {
     throw new Error("Admin or Manager access required")
   }
   return session

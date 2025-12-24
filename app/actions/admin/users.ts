@@ -10,7 +10,8 @@ async function requireAdminOrManager() {
   if (!session?.user) {
     throw new Error("Unauthorized")
   }
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
+  const role = session.user.role as string
+  if (!["ADMIN", "MANAGER", "SRJLABS"].includes(role)) {
     throw new Error("Admin or Manager access required")
   }
   return session
@@ -66,7 +67,7 @@ export async function createUser(data: {
         name: data.name,
         email: data.email,
         password: hashedPassword,
-        role: data.role,
+        role: data.role as any, // Cast to allow SRJLABS role until Prisma types refresh
       },
       select: {
         id: true,
@@ -119,7 +120,7 @@ export async function updateUser(
       data: {
         ...(data.name && { name: data.name }),
         ...(data.email && { email: data.email }),
-        ...(data.role && { role: data.role }),
+        ...(data.role && { role: data.role as any }), // Cast to allow SRJLABS role until Prisma types refresh
       },
       select: {
         id: true,
