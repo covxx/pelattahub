@@ -40,7 +40,15 @@ fi
 # BUILD LOCALLY
 # =============================================================================
 echo "🔨 Building Docker image locally (amd64 platform)..."
-docker build --platform linux/amd64 --no-cache -t wms-app .
+# Get current git commit ID for version display
+COMMIT_ID=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+if [ -n "$COMMIT_ID" ]; then
+  echo "📝 Building with commit ID: $COMMIT_ID"
+  docker build --platform linux/amd64 --no-cache --build-arg COMMIT_ID="$COMMIT_ID" -t wms-app .
+else
+  echo "⚠️  No git commit ID available, building without commit ID"
+  docker build --platform linux/amd64 --no-cache -t wms-app .
+fi
 
 if [ $? -ne 0 ]; then
   echo "❌ Build failed!"
