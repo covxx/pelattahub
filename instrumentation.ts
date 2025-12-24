@@ -6,3 +6,5 @@ export async function register() {
     console.log('[Instrumentation] New Relic agent loaded successfully')
   }
 }
+
+
