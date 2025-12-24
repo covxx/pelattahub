@@ -15,7 +15,7 @@ export default async function AdminLayout({
   }
 
   if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
-    redirect("/dashboard")
+    redirect("/dashboard/inventory")
   }
 
   const isAdmin = session.user.role === "ADMIN"
