@@ -13,28 +13,23 @@ export const APP_VERSION_NAME = "Orion"
  */
 export function getCommitId(): string {
   // Try environment variable first (set during build/deploy)
-  // NEXT_PUBLIC_ prefix makes it available on client-side
-  if (typeof window !== 'undefined') {
-    // Client-side: use public env var
-    const commitId = process.env.NEXT_PUBLIC_COMMIT_ID
-    if (commitId) {
-      return commitId.substring(0, 7) // Short commit hash
-    }
-  } else {
-    // Server-side: can use private env var or try git
-    const commitId = process.env.NEXT_PUBLIC_COMMIT_ID || process.env.COMMIT_ID
-    if (commitId) {
-      return commitId.substring(0, 7)
-    }
-    
-    // Try to read from git (server-side only)
+  // NEXT_PUBLIC_ prefix makes it available on both client and server
+  const commitId = process.env.NEXT_PUBLIC_COMMIT_ID || process.env.COMMIT_ID
+  
+  if (commitId && commitId.trim()) {
+    return commitId.trim().substring(0, 7) // Short commit hash
+  }
+  
+  // Server-side: try to read from git as fallback
+  if (typeof window === 'undefined') {
     try {
       const { execSync } = require('child_process')
-      const commitId = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
-      return commitId
+      const gitCommitId = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
+      if (gitCommitId) {
+        return gitCommitId
+      }
     } catch {
       // Git not available or not in a git repo
-      return 'dev'
     }
   }
   
