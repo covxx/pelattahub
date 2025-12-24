@@ -14,8 +14,8 @@ export default async function SystemHealthPage() {
     redirect("/login")
   }
 
-  // Allow ADMIN, MANAGER, and SRJLABS roles (consistent with health actions)
-  if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER" && session.user.role !== "SRJLABS") {
+  // Admin only
+  if (session.user.role !== "ADMIN") {
     redirect("/dashboard")
   }
 
