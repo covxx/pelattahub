@@ -333,87 +333,43 @@ if [ "$DB_READY" = false ]; then
   echo -e "${YELLOW}⚠️  Database service may not be fully ready, proceeding anyway...${NC}"
 fi
 
-# First, try to check migration status (with strict timeout)
-echo -e "${BLUE}   Checking for pending migrations (15s timeout)...${NC}"
+# Skip status check - just run migrate deploy directly (it's idempotent)
+# This prevents hanging on status checks that can get stuck
+echo -e "${BLUE}   Applying database migrations (migrate deploy is idempotent)...${NC}"
+echo -e "${YELLOW}   Note: Skipping status check to prevent hanging. migrate deploy will only apply pending migrations.${NC}"
 
-# Use a background process with timeout to prevent hanging
-MIGRATION_STATUS=""
-MIGRATION_CHECK_PID=""
-
+MIGRATION_SUCCESS=false
 if command -v timeout >/dev/null 2>&1; then
-  # Run migration status in background with timeout
-  timeout 15 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" > /tmp/migration_status.txt 2>&1 &
-  MIGRATION_CHECK_PID=$!
-  
-  # Wait for it with a timeout
-  WAIT_COUNT=0
-  while kill -0 $MIGRATION_CHECK_PID 2>/dev/null && [ $WAIT_COUNT -lt 20 ]; do
-    sleep 1
-    WAIT_COUNT=$((WAIT_COUNT + 1))
-  done
-  
-  # Check if process is still running (timed out)
-  if kill -0 $MIGRATION_CHECK_PID 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Migration status check is taking too long, skipping status check...${NC}"
-    kill $MIGRATION_CHECK_PID 2>/dev/null || true
-    wait $MIGRATION_CHECK_PID 2>/dev/null || true
-    MIGRATION_STATUS="TIMEOUT"
+  echo -e "${BLUE}   Running migrations (with 120s timeout)...${NC}"
+  if timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+    MIGRATION_SUCCESS=true
   else
-    # Process completed, read the result
-    wait $MIGRATION_CHECK_PID 2>/dev/null
     EXIT_CODE=$?
-    if [ -f /tmp/migration_status.txt ]; then
-      MIGRATION_STATUS=$(cat /tmp/migration_status.txt)
-      rm -f /tmp/migration_status.txt
-    fi
-    
-    if [ $EXIT_CODE -eq 124 ] || [ $EXIT_CODE -eq 143 ]; then
-      echo -e "${YELLOW}⚠️  Migration status check timed out, skipping status check...${NC}"
-      MIGRATION_STATUS="TIMEOUT"
-    elif [ $EXIT_CODE -ne 0 ]; then
-      echo -e "${YELLOW}⚠️  Migration status check failed (exit code: $EXIT_CODE), will attempt deploy anyway...${NC}"
-      MIGRATION_STATUS="ERROR"
+    if [ $EXIT_CODE -eq 124 ]; then
+      echo -e "${RED}❌ Migration deploy timed out after 120 seconds${NC}"
+    else
+      echo -e "${RED}❌ Migration deploy failed (exit code: $EXIT_CODE)${NC}"
     fi
   fi
 else
-  # No timeout command, try a quick check with a simple command first
-  echo -e "${YELLOW}   No timeout command available, attempting quick status check...${NC}"
-  MIGRATION_STATUS=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1) || {
-    EXIT_CODE=$?
-    echo -e "${YELLOW}⚠️  Migration status check failed (exit code: $EXIT_CODE), will attempt deploy anyway...${NC}"
-    MIGRATION_STATUS="ERROR"
-  }
+  echo -e "${BLUE}   Running migrations (no timeout available)...${NC}"
+  if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+    MIGRATION_SUCCESS=true
+  else
+    echo -e "${RED}❌ Migration deploy failed${NC}"
+  fi
 fi
 
-# Show status if we got it
-if [ -n "$MIGRATION_STATUS" ] && [ "$MIGRATION_STATUS" != "TIMEOUT" ] && [ "$MIGRATION_STATUS" != "ERROR" ]; then
-  echo -e "${BLUE}   Migration status:${NC}"
-  echo "$MIGRATION_STATUS" | head -3 | while IFS= read -r line; do
-    echo -e "${BLUE}   > $line${NC}"
-  done
+if [ "$MIGRATION_SUCCESS" = true ]; then
+  echo -e "${GREEN}✅ Migrations completed successfully${NC}"
+else
+  echo -e "${RED}❌ Migration failed! Check logs:${NC}"
+  docker compose logs --tail=20 app
+  exit 1
 fi
 
-# If status check timed out or failed, skip to deploy (which is idempotent)
-if [ "$MIGRATION_STATUS" = "TIMEOUT" ] || [ "$MIGRATION_STATUS" = "ERROR" ]; then
-  echo -e "${YELLOW}⚠️  Skipping status check, proceeding directly to migration deploy...${NC}"
-  echo ""
-  echo -e "${YELLOW}   Applying migrations (migrate deploy is idempotent)...${NC}"
-  
-  MIGRATION_SUCCESS=false
-  if command -v timeout >/dev/null 2>&1; then
-    timeout 120 docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" && MIGRATION_SUCCESS=true
-  else
-    docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy" && MIGRATION_SUCCESS=true
-  fi
-  
-  if [ "$MIGRATION_SUCCESS" = true ]; then
-    echo -e "${GREEN}✅ Migrations completed${NC}"
-  else
-    echo -e "${RED}❌ Migration failed! Check logs:${NC}"
-    docker compose logs --tail=20 app
-    exit 1
-  fi
-elif echo "$MIGRATION_STATUS" | grep -q "Database schema is up to date"; then
+# Old status check code removed - was causing hangs
+# If you need to check status, run manually: docker compose exec app npx prisma migrate status
   echo -e "${GREEN}✅ Database schema is up to date - no migrations needed${NC}"
 elif echo "$MIGRATION_STATUS" | grep -q "following migration have not yet been applied"; then
   echo -e "${YELLOW}⚠️  Pending migrations detected:${NC}"
