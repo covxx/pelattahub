@@ -277,17 +277,66 @@ echo -e "${GREEN}✅ Services are running${NC}"
 echo ""
 
 # =============================================================================
-# 7. Run Database Migrations
+# 7. Check and Run Database Migrations
 # =============================================================================
-echo -e "${YELLOW}🗄️  Running database migrations...${NC}"
-# Use the Prisma version from package.json (6.19.0)
-# The --yes flag prevents npx from prompting, and @6.19.0 ensures we use the correct version
-if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
-  echo -e "${GREEN}✅ Migrations completed${NC}"
+echo -e "${YELLOW}🗄️  Checking database migration status...${NC}"
+
+# First, check if there are pending migrations
+echo -e "${BLUE}   Checking for pending migrations...${NC}"
+MIGRATION_STATUS=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+
+if echo "$MIGRATION_STATUS" | grep -q "Database schema is up to date"; then
+  echo -e "${GREEN}✅ Database schema is up to date - no migrations needed${NC}"
+elif echo "$MIGRATION_STATUS" | grep -q "following migration have not yet been applied"; then
+  echo -e "${YELLOW}⚠️  Pending migrations detected:${NC}"
+  echo "$MIGRATION_STATUS" | grep -A 20 "following migration" || true
+  echo ""
+  echo -e "${YELLOW}   Applying pending migrations...${NC}"
+  
+  # Run migrations
+  if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+    echo -e "${GREEN}✅ Migrations applied successfully${NC}"
+    
+    # Verify migrations were applied
+    echo -e "${BLUE}   Verifying migration status...${NC}"
+    FINAL_STATUS=$(docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate status" 2>&1 || echo "ERROR")
+    if echo "$FINAL_STATUS" | grep -q "Database schema is up to date"; then
+      echo -e "${GREEN}✅ Database schema verified as up to date${NC}"
+    else
+      echo -e "${YELLOW}⚠️  Migration status check returned:${NC}"
+      echo "$FINAL_STATUS"
+    fi
+  else
+    echo -e "${RED}❌ Migration failed! Check logs:${NC}"
+    docker compose logs --tail=20 app
+    exit 1
+  fi
+elif echo "$MIGRATION_STATUS" | grep -q "ERROR\|error\|Error"; then
+  echo -e "${YELLOW}⚠️  Could not check migration status, attempting to apply migrations anyway...${NC}"
+  echo "   Status output: $MIGRATION_STATUS"
+  echo ""
+  
+  # Try to run migrations anyway
+  if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+    echo -e "${GREEN}✅ Migrations completed${NC}"
+  else
+    echo -e "${RED}❌ Migration failed! Check logs:${NC}"
+    docker compose logs --tail=20 app
+    exit 1
+  fi
 else
-  echo -e "${RED}❌ Migration failed! Check logs:${NC}"
-  docker compose logs --tail=20 app
-  exit 1
+  # Unknown status, try to apply migrations
+  echo -e "${YELLOW}⚠️  Migration status unclear, attempting to apply migrations...${NC}"
+  echo "   Status output: $MIGRATION_STATUS"
+  echo ""
+  
+  if docker compose exec -T app sh -c "npx --yes prisma@6.19.0 migrate deploy"; then
+    echo -e "${GREEN}✅ Migrations completed${NC}"
+  else
+    echo -e "${RED}❌ Migration failed! Check logs:${NC}"
+    docker compose logs --tail=20 app
+    exit 1
+  fi
 fi
 echo ""
 
