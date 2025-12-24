@@ -51,6 +51,7 @@ export function AdminSidebar({ isAdmin, isManager, isSrjLabs = false }: AdminSid
   const adminOnlyItems = (isAdmin || isSrjLabs) ? [
     { href: "/dashboard/admin/logs", label: "System Logs", icon: FileText },
     { href: "/dashboard/admin/health", label: "System Health", icon: Activity },
+    { href: "/dashboard/admin/dev-options", label: "Dev Options", icon: TestTube },
   ] : []
 
   // SRJLABS only items (dev/test tools)

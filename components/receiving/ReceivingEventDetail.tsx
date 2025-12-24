@@ -343,7 +343,34 @@ export function ReceivingEventDetail({
               </tr>
             </thead>
             <tbody>
-              {event.lots.map((lot: any) => (
+              {event.lots.map((lot: any) => {
+                // Convert quantity to receiving unit type if different from product unit type
+                let displayQuantity = lot.original_quantity
+                let displayUnit = lot.product.unit_type
+                
+                if (lot.receiving_unit_type && lot.receiving_unit_type !== lot.product.unit_type && lot.product.standard_case_weight) {
+                  if (lot.receiving_unit_type === "LBS" && lot.product.unit_type === "CASE") {
+                    // Convert cases back to pounds
+                    displayQuantity = Math.round(lot.original_quantity * lot.product.standard_case_weight)
+                    displayUnit = "LBS"
+                  } else if (lot.receiving_unit_type === "CASE" && lot.product.unit_type === "LBS") {
+                    // Convert pounds back to cases
+                    displayQuantity = Math.round(lot.original_quantity / lot.product.standard_case_weight)
+                    displayUnit = "CASE"
+                  }
+                }
+                
+                // Calculate current quantity in receiving unit type
+                let displayCurrentQuantity = lot.quantity_current
+                if (lot.receiving_unit_type && lot.receiving_unit_type !== lot.product.unit_type && lot.product.standard_case_weight) {
+                  if (lot.receiving_unit_type === "LBS" && lot.product.unit_type === "CASE") {
+                    displayCurrentQuantity = Math.round(lot.quantity_current * lot.product.standard_case_weight)
+                  } else if (lot.receiving_unit_type === "CASE" && lot.product.unit_type === "LBS") {
+                    displayCurrentQuantity = Math.round(lot.quantity_current / lot.product.standard_case_weight)
+                  }
+                }
+                
+                return (
                 <tr key={lot.id} className="border-b">
                   <td className="font-mono text-sm py-3">{lot.lot_number}</td>
                   <td className="py-3">{lot.product.name}</td>
@@ -361,11 +388,11 @@ export function ReceivingEventDetail({
                         disabled={isSaving}
                       />
                     ) : (
-                      lot.original_quantity
+                      displayQuantity
                     )}
                   </td>
-                  <td className="py-3">{lot.product.unit_type}</td>
-                  <td className="text-right py-3">{lot.quantity_current}</td>
+                  <td className="py-3">{displayUnit}</td>
+                  <td className="text-right py-3">{displayCurrentQuantity}</td>
                   <td className="text-center py-3">
                     <Button
                       size="sm"
@@ -411,7 +438,8 @@ export function ReceivingEventDetail({
                     </td>
                   )}
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
             <tfoot>
               <tr className="font-bold">

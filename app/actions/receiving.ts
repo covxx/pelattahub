@@ -136,15 +136,19 @@ export async function receiveBatchInventory(input: BatchReceivingInput) {
         }
         // If unit types match (CASE/CASE or LBS/LBS), use quantity as-is
 
+        // Round final quantity to nearest integer for storage (Int field)
+        const roundedQuantity = Math.round(finalQuantity)
+
         // Create inventory lot
         const lot = await tx.inventoryLot.create({
           data: {
             lot_number: lotNumber,
             product_id: product.id,
             receiving_event_id: receivingEvent.id,
-            original_quantity: finalQuantity,
-            quantity_received: finalQuantity,
-            quantity_current: finalQuantity,
+            original_quantity: roundedQuantity,
+            quantity_received: roundedQuantity,
+            quantity_current: roundedQuantity,
+            receiving_unit_type: item.unitType !== product.unit_type ? item.unitType : null, // Store if different from product unit type
             received_date: input.date,
             expiry_date: expiryDate,
             origin_country: product.default_origin_country,

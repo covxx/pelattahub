@@ -467,22 +467,40 @@ export function BatchReceivingForm({
                 </tr>
               </thead>
               <tbody>
-                {receivingEvent.lots.map((lot: any) => (
-                  <tr key={lot.id} className="border-b">
-                    <td className="font-mono text-sm py-3">{lot.lot_number}</td>
-                    <td className="py-3">{lot.product.name}</td>
-                    <td className="font-mono text-sm py-3">{lot.product.sku}</td>
-                    <td className="text-right py-3">{lot.original_quantity}</td>
-                    <td className="py-3">{lot.product.unit_type}</td>
-                    <td className="py-3">
-                      <LotPrintOptions
-                        lot={lot}
-                        onPrintMaster={() => handlePrintMaster(lot)}
-                        onPrintCases={(qty: number) => handlePrintCases(lot, qty)}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {receivingEvent.lots.map((lot: any) => {
+                  // Convert quantity to receiving unit type if different from product unit type
+                  let displayQuantity = lot.original_quantity
+                  let displayUnit = lot.product.unit_type
+                  
+                  if (lot.receiving_unit_type && lot.receiving_unit_type !== lot.product.unit_type && lot.product.standard_case_weight) {
+                    if (lot.receiving_unit_type === "LBS" && lot.product.unit_type === "CASE") {
+                      // Convert cases back to pounds
+                      displayQuantity = Math.round(lot.original_quantity * lot.product.standard_case_weight)
+                      displayUnit = "LBS"
+                    } else if (lot.receiving_unit_type === "CASE" && lot.product.unit_type === "LBS") {
+                      // Convert pounds back to cases
+                      displayQuantity = Math.round(lot.original_quantity / lot.product.standard_case_weight)
+                      displayUnit = "CASE"
+                    }
+                  }
+                  
+                  return (
+                    <tr key={lot.id} className="border-b">
+                      <td className="font-mono text-sm py-3">{lot.lot_number}</td>
+                      <td className="py-3">{lot.product.name}</td>
+                      <td className="font-mono text-sm py-3">{lot.product.sku}</td>
+                      <td className="text-right py-3">{displayQuantity}</td>
+                      <td className="py-3">{displayUnit}</td>
+                      <td className="py-3">
+                        <LotPrintOptions
+                          lot={lot}
+                          onPrintMaster={() => handlePrintMaster(lot)}
+                          onPrintCases={(qty: number) => handlePrintCases(lot, qty)}
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="font-bold">

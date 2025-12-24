@@ -16,7 +16,6 @@ enum Role {
   RECEIVER
   PACKER
   MANAGER
-  SRJLABS
 }
 
 // Lot Status Enum
@@ -241,8 +240,6 @@ model ReceivingEvent {
   notes           String?
   created_by      String
   user            User             @relation(fields: [created_by], references: [id], onDelete: Restrict)
-  qbo_id          String?          // QuickBooks Online Bill ID
-  qbo_sync_token  String?          // QBO SyncToken for optimistic locking
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   
@@ -254,7 +251,6 @@ model ReceivingEvent {
   @@index([received_date])
   @@index([status])
   @@index([receipt_number])
-  @@index([qbo_id])
   @@map("receiving_events")
 }
 

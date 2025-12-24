@@ -6,12 +6,12 @@ import { getDevStats } from "@/app/actions/dev-options"
 export default async function DevOptionsPage() {
   const session = await auth()
 
-  // Security Check: Only SRJLABS role can access
+  // Security Check: Only ADMIN and SRJLABS roles can access
   if (!session?.user) {
     redirect("/login")
   }
 
-  if (session.user.role !== "SRJLABS") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "SRJLABS") {
     redirect("/dashboard/inventory")
   }
 
@@ -40,4 +40,5 @@ export default async function DevOptionsPage() {
     </div>
   )
 }
+
 
