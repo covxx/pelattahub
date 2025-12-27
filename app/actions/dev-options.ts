@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { generateUniqueGTIN, isValidGTIN } from "@/lib/gtin"
 import { revalidatePath } from "next/cache"
 import { requireAdmin } from "@/lib/auth-helpers"
 
@@ -291,6 +292,66 @@ export async function clearAllData() {
   
   revalidatePath("/dashboard/admin/dev-options")
   return { success: true }
+}
+
+/**
+ * Repair invalid or duplicate GTINs on products by regenerating unique GTIN14 values.
+ * - Regenerates GTINs that are not 14 numeric digits.
+ * - Regenerates any GTIN that appears more than once.
+ */
+export async function repairProductGtins() {
+  await requireAdmin()
+
+  const gs1Setting = await prisma.systemSetting.findUnique({
+    where: { key: "gs1_prefix" },
+  })
+  const gs1Prefix = gs1Setting?.value || "000000"
+
+  const products = await prisma.product.findMany({
+    select: { id: true, gtin: true },
+  })
+
+  const counts = new Map<string, number>()
+  for (const p of products) {
+    if (p.gtin) {
+      counts.set(p.gtin, (counts.get(p.gtin) || 0) + 1)
+    }
+  }
+
+  const toRepair = products.filter((p) => !isValidGTIN(p.gtin) || (p.gtin ? counts.get(p.gtin)! > 1 : false))
+
+  const updated: { id: string; old: string | null; new: string }[] = []
+  const errors: string[] = []
+
+  for (const product of toRepair) {
+    try {
+      const newGtin = await generateUniqueGTIN(gs1Prefix, product.id, async (candidate) => {
+        const exists = await prisma.product.findUnique({ where: { gtin: candidate } })
+        return exists !== null && exists.id !== product.id
+      })
+
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { gtin: newGtin },
+      })
+
+      updated.push({ id: product.id, old: product.gtin, new: newGtin })
+    } catch (err) {
+      errors.push(
+        `Failed to repair product ${product.id}: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      )
+    }
+  }
+
+  revalidatePath("/dashboard/admin/dev-options")
+  return {
+    success: errors.length === 0,
+    repaired: updated.length,
+    errors: errors.length > 0 ? errors : undefined,
+    details: updated,
+  }
 }
 
 /**
