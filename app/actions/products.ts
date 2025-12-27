@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
 import { requireAdminOrManager } from "@/lib/auth-helpers"
+import { isValidGTIN } from "@/lib/gtin"
 
 /**
  * Get all products
@@ -94,6 +95,19 @@ export async function createProduct(data: {
     throw new Error("GTIN is required")
   }
 
+  const normalizedGtin = data.gtin.trim()
+  if (!isValidGTIN(normalizedGtin)) {
+    throw new Error("GTIN must be a valid 14-digit value")
+  }
+
+  const existingGtin = await prisma.product.findUnique({
+    where: { gtin: normalizedGtin },
+  })
+
+  if (existingGtin) {
+    throw new Error("Product with this GTIN already exists")
+  }
+
   if (!data.default_origin_country) {
     throw new Error("Default origin country is required")
   }
@@ -112,7 +126,7 @@ export async function createProduct(data: {
     data: {
       sku: data.sku,
       name: data.name,
-      gtin: data.gtin,
+      gtin: normalizedGtin,
       default_origin_country: data.default_origin_country,
       unit_type: data.unit_type || "CASE",
       standard_case_weight: data.standard_case_weight || null,
@@ -182,8 +196,21 @@ export async function updateProduct(
   })
 
   // Validate required fields if provided
-  if (data.gtin !== undefined && !data.gtin) {
-    throw new Error("GTIN cannot be empty")
+  let normalizedGtin: string | undefined
+  if (data.gtin !== undefined) {
+    if (!data.gtin) {
+      throw new Error("GTIN cannot be empty")
+    }
+    normalizedGtin = data.gtin.trim()
+    if (!isValidGTIN(normalizedGtin)) {
+      throw new Error("GTIN must be a valid 14-digit value")
+    }
+    const existingGtin = await prisma.product.findUnique({
+      where: { gtin: normalizedGtin },
+    })
+    if (existingGtin && existingGtin.id !== id) {
+      throw new Error("Product with this GTIN already exists")
+    }
   }
 
   if (data.default_origin_country !== undefined && !data.default_origin_country) {
@@ -195,7 +222,7 @@ export async function updateProduct(
     data: {
       ...(data.sku && { sku: data.sku }),
       ...(data.name && { name: data.name }),
-      ...(data.gtin !== undefined && { gtin: data.gtin }),
+      ...(data.gtin !== undefined && normalizedGtin && { gtin: normalizedGtin }),
       ...(data.default_origin_country !== undefined && { default_origin_country: data.default_origin_country }),
       ...(data.unit_type && { unit_type: data.unit_type }),
       standard_case_weight: data.standard_case_weight !== undefined ? data.standard_case_weight : undefined,

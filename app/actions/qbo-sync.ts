@@ -12,6 +12,7 @@ import {
   fetchQboByQuery,
 } from "@/lib/qbo"
 import { logActivity, AuditAction, EntityType } from "@/lib/logger"
+import { Prisma } from "@prisma/client"
 import { isValidGTIN, generateUniqueGTIN } from "@/lib/gtin"
 import { requireAdminOrManager } from "@/lib/auth-helpers"
 
@@ -305,29 +306,60 @@ export async function importQboItems() {
           }
 
           // Generate unique GTIN for new product
-          const gtin = await generateUniqueGTIN(
-            gs1Prefix,
-            qboItem.Id, // Use QBO ID as seed for GTIN generation
-            async (gtin) => {
-              const exists = await prisma.product.findUnique({ where: { gtin } })
-              return exists !== null
-            }
-          )
+          const buildGtin = async (seed: string) =>
+            generateUniqueGTIN(
+              gs1Prefix,
+              seed,
+              async (candidate) => {
+                const exists = await prisma.product.findUnique({ where: { gtin: candidate } })
+                return exists !== null
+              }
+            )
 
-          // Create new product
-          await prisma.product.create({
-            data: {
-              name: wmsData.name,
-              sku: wmsData.sku,
-              gtin,
-              description: wmsData.description,
-              default_origin_country: "USA", // Default value
-              unit_type: "CASE", // Default value
-              qbo_id: wmsData.qbo_id,
-              qbo_sync_token: wmsData.qbo_sync_token,
-            } as any,
-          })
-          imported++
+          let gtin = await buildGtin(qboItem.Id) // Use QBO ID as seed for GTIN generation
+
+          // Create new product with retry on rare race-condition duplicates
+          try {
+            await prisma.product.create({
+              data: {
+                name: wmsData.name,
+                sku: wmsData.sku,
+                gtin,
+                description: wmsData.description,
+                default_origin_country: "USA", // Default value
+                unit_type: "CASE", // Default value
+                qbo_id: wmsData.qbo_id,
+                qbo_sync_token: wmsData.qbo_sync_token,
+              } as any,
+            })
+            imported++
+          } catch (createError) {
+            const isUniqueGtin =
+              createError instanceof Prisma.PrismaClientKnownRequestError &&
+              createError.code === "P2002" &&
+              Array.isArray((createError.meta as any)?.target) &&
+              ((createError.meta as any)?.target as string[]).includes("gtin")
+
+            if (isUniqueGtin) {
+              // Regenerate with extra entropy to avoid collision
+              gtin = await buildGtin(`${qboItem.Id}-${Date.now()}`)
+              await prisma.product.create({
+                data: {
+                  name: wmsData.name,
+                  sku: wmsData.sku,
+                  gtin,
+                  description: wmsData.description,
+                  default_origin_country: "USA", // Default value
+                  unit_type: "CASE", // Default value
+                  qbo_id: wmsData.qbo_id,
+                  qbo_sync_token: wmsData.qbo_sync_token,
+                } as any,
+              })
+              imported++
+            } else {
+              throw createError
+            }
+          }
         }
       } catch (itemError) {
         errors.push(

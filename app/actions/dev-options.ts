@@ -66,10 +66,27 @@ export async function clearCustomers() {
 export async function clearProducts() {
   await requireAdmin()
 
-  const count = await prisma.product.deleteMany({})
+  const result = await prisma.$transaction(async (tx) => {
+    // Remove dependents first due to FK restrictions (picks/allocations/prod runs -> lots -> products, orderItems -> products)
+    const picks = await tx.orderPick.deleteMany({})
+    const allocations = await tx.orderAllocation.deleteMany({})
+    const productionRuns = await tx.productionRun.deleteMany({})
+    const orderItems = await tx.orderItem.deleteMany({})
+    const lots = await tx.inventoryLot.deleteMany({})
+    const products = await tx.product.deleteMany({})
+
+    return {
+      picks: picks.count,
+      allocations: allocations.count,
+      productionRuns: productionRuns.count,
+      orderItems: orderItems.count,
+      lots: lots.count,
+      products: products.count,
+    }
+  })
   
   revalidatePath("/dashboard/admin/dev-options")
-  return { success: true, count: count.count }
+  return { success: true, count: result.products }
 }
 
 /**
@@ -79,8 +96,23 @@ export async function clearAndReimportProducts() {
   await requireAdmin()
 
   try {
-    // Clear all products
-    const deletedCount = await prisma.product.deleteMany({})
+    // Clear all products (and dependents) first
+    const cleared = await prisma.$transaction(async (tx) => {
+      const picks = await tx.orderPick.deleteMany({})
+      const allocations = await tx.orderAllocation.deleteMany({})
+      const productionRuns = await tx.productionRun.deleteMany({})
+      const orderItems = await tx.orderItem.deleteMany({})
+      const lots = await tx.inventoryLot.deleteMany({})
+      const products = await tx.product.deleteMany({})
+      return {
+        picks: picks.count,
+        allocations: allocations.count,
+        productionRuns: productionRuns.count,
+        orderItems: orderItems.count,
+        lots: lots.count,
+        products: products.count,
+      }
+    })
     
     // Reimport from QBO (this will use the new GTIN generation)
     const { importQboItems } = await import("@/app/actions/qbo-sync")
@@ -89,7 +121,7 @@ export async function clearAndReimportProducts() {
     revalidatePath("/dashboard/admin/dev-options")
     return { 
       success: importResult.success, 
-      deleted: deletedCount.count,
+      deleted: cleared.products,
       imported: importResult.imported || 0,
       updated: importResult.updated || 0,
       error: importResult.error
