@@ -5,16 +5,13 @@ import { prisma } from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { revalidatePath } from "next/cache"
+import { requireAdmin as requireAdminHelper } from "@/lib/auth-helpers"
 
 /**
  * Check if current user is admin
  */
 async function requireAdmin() {
-  const session = await auth()
-  if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SRJLABS")) {
-    throw new Error("Unauthorized: Admin access required")
-  }
-  return session
+  return await requireAdminHelper()
 }
 
 /**

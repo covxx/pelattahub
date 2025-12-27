@@ -16,7 +16,8 @@ export default auth((req, ctx) => {
     }
 
     // If logged in but not ADMIN, MANAGER, or SRJLABS role, redirect to forbidden page
-    if (userRole !== "ADMIN" && userRole !== "MANAGER" && userRole !== "SRJLABS") {
+    const allowedRoles = ["ADMIN", "MANAGER", "SRJLABS"]
+    if (!allowedRoles.includes(userRole as string)) {
       return NextResponse.redirect(new URL("/forbidden", req.url))
     }
   }

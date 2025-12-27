@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { ProductCombobox } from "@/components/receiving/ProductCombobox"
 import { UnitToggle } from "@/components/rugged/UnitToggle"
-import { convertInventory, batchConvertInventory, getLotByLotNumber } from "@/app/actions/production"
+import { convertInventory, batchConvertInventory, getLotByLotNumber, getLotSuggestions } from "@/app/actions/production"
 import { useToast } from "@/hooks/useToast"
 import { usePrintLabel } from "@/hooks/usePrintLabel"
 import { format } from "date-fns"
@@ -40,6 +40,16 @@ interface SourceLotEntry {
 export function ProductionRepackForm({ products }: ProductionRepackFormProps) {
   const [sourceLotNumber, setSourceLotNumber] = useState("")
   const [sourceLots, setSourceLots] = useState<SourceLotEntry[]>([])
+  const [lotSuggestions, setLotSuggestions] = useState<
+    Array<{
+      id: string
+      lot_number: string
+      product_name: string
+      product_sku: string
+      unit_type: string
+      received_date: Date
+    }>
+  >([])
   const [outputProductId, setOutputProductId] = useState<string>("")
   const [quantityProduced, setQuantityProduced] = useState<number>(0)
   const [unitType, setUnitType] = useState<"CASE" | "LBS">("CASE")
@@ -92,6 +102,34 @@ export function ProductionRepackForm({ products }: ProductionRepackFormProps) {
         toast(result.error || "Lot not found", "error")
       }
     })
+  }
+
+  // Fetch lot suggestions as the user types
+  useEffect(() => {
+    const value = sourceLotNumber.trim()
+    if (value.length < 2) {
+      setLotSuggestions([])
+      return
+    }
+    let cancelled = false
+    startTransition(async () => {
+      const res = await getLotSuggestions(value)
+      if (!cancelled && res.success && res.data) {
+        setLotSuggestions(res.data)
+      }
+      if (!cancelled && (!res.success || !res.data)) {
+        setLotSuggestions([])
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [sourceLotNumber])
+
+  const handleSelectSuggestion = (lotNumber: string) => {
+    setSourceLotNumber(lotNumber)
+    setLotSuggestions([])
+    handleScanSourceLot()
   }
 
   const handleRemoveSourceLot = (lotNumber: string) => {
@@ -264,6 +302,23 @@ export function ProductionRepackForm({ products }: ProductionRepackFormProps) {
                   Scan
                 </Button>
               </div>
+              {lotSuggestions.length > 0 && (
+                <div className="border rounded-md bg-muted/50 p-2 space-y-1 max-h-56 overflow-y-auto">
+                  {lotSuggestions.map((lot) => (
+                    <button
+                      key={lot.id}
+                      type="button"
+                      className="w-full text-left px-2 py-1 rounded hover:bg-muted transition"
+                      onClick={() => handleSelectSuggestion(lot.lot_number)}
+                    >
+                      <div className="text-sm font-medium">{lot.lot_number}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {lot.product_name} ({lot.product_sku}) • {lot.unit_type}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {sourceLots.length > 0 && (

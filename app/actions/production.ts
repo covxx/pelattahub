@@ -612,3 +612,66 @@ export async function getLotByLotNumber(lotNumber: string) {
   }
 }
 
+/**
+ * Get lot suggestions by lot number prefix (for typeahead)
+ */
+export async function getLotSuggestions(prefix: string) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return {
+      success: false,
+      error: "Unauthorized - Please log in",
+    }
+  }
+
+  if (!prefix || prefix.trim().length < 2) {
+    return {
+      success: true,
+      data: [],
+    }
+  }
+
+  try {
+    const lots = await prisma.inventoryLot.findMany({
+      where: {
+        lot_number: {
+          startsWith: prefix.trim(),
+          mode: "insensitive",
+        },
+      },
+      take: 10,
+      orderBy: {
+        received_date: "desc",
+      },
+      include: {
+        product: {
+          select: {
+            name: true,
+            sku: true,
+            unit_type: true,
+          },
+        },
+      },
+    })
+
+    return {
+      success: true,
+      data: lots.map((lot) => ({
+        id: lot.id,
+        lot_number: lot.lot_number,
+        product_name: lot.product.name,
+        product_sku: lot.product.sku,
+        unit_type: lot.product.unit_type,
+        received_date: lot.received_date,
+      })),
+    }
+  } catch (error) {
+    console.error("Error fetching lot suggestions:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch lot suggestions",
+    }
+  }
+}
+

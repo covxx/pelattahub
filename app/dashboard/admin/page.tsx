@@ -12,13 +12,15 @@ import {
   Settings,
   Link2
 } from "lucide-react"
+import { isAdmin, isAdminOrManager, isSrjLabs } from "@/lib/auth-helpers"
 
 export default async function AdminDashboardPage() {
   const session = await auth()
   const stats = await getAdminStats()
-  const isAdmin = session?.user?.role === "ADMIN"
-  const isManager = session?.user?.role === "MANAGER"
-  const isSrjLabs = session?.user?.role === "SRJLABS"
+  const userRole = session?.user?.role as string | undefined
+  const isAdminUser = isAdmin(userRole)
+  const isManagerUser = isAdminOrManager(userRole) && !isAdminUser && !isSrjLabs(userRole)
+  const isSrjLabsUser = isSrjLabs(userRole)
 
   // Navigation cards grouped by category
   const dataManagementCards = [
@@ -78,7 +80,7 @@ export default async function AdminDashboardPage() {
   ]
 
   // Management tools (Admin and Manager)
-  const managementCards = (isAdmin || isManager || isSrjLabs) ? [
+  const managementCards = (isAdminUser || isManagerUser || isSrjLabsUser) ? [
     {
       href: "/dashboard/admin/recall",
       title: "Recall Management",
@@ -88,7 +90,7 @@ export default async function AdminDashboardPage() {
   ] : []
 
   // Admin only cards
-  const adminOnlyCards = (isAdmin || isSrjLabs) ? [
+  const adminOnlyCards = (isAdminUser || isSrjLabsUser) ? [
     {
       href: "/dashboard/admin/logs",
       title: "System Logs",

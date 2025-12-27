@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import bcrypt from "bcryptjs"
-import { requireAdminOrManager } from "@/lib/auth-helpers"
+import { requireAdminOrManager, getSession } from "@/lib/auth-helpers"
 
 /**
  * Get all users
@@ -164,8 +164,8 @@ export async function deleteUser(id: string) {
 
   try {
     // Prevent deleting yourself
-    const session = await auth()
-    if (session?.user?.id === id) {
+    const session = await getSession()
+    if (session.user.id === id) {
       return {
         success: false,
         error: "Cannot delete your own account",

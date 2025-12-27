@@ -169,7 +169,7 @@ export function AddUserDialog({
                       <SelectItem value={Role.RECEIVER}>Receiver</SelectItem>
                       <SelectItem value={Role.PACKER}>Packer</SelectItem>
                       <SelectItem value={Role.MANAGER}>Manager</SelectItem>
-                      <SelectItem value={Role.SRJLABS}>SRJLabs (Super Admin)</SelectItem>
+                      <SelectItem value="SRJLABS">SRJLabs (Super Admin)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

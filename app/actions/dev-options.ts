@@ -2,25 +2,41 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { requireSrjLabs } from "@/lib/auth-helpers"
+import { requireAdmin } from "@/lib/auth-helpers"
 
 /**
  * Clear all inventory lots
  */
 export async function clearInventory() {
-  await requireSrjLabs()
+  await requireAdmin()
 
-  const count = await prisma.inventoryLot.deleteMany({})
-  
+  // Delete dependent records first due to foreign key restrictions:
+  // - order_picks -> inventory_lots (Restrict)
+  // - order_allocations -> inventory_lots (Restrict)
+  // - production_runs -> inventory_lots (Restrict)
+  const result = await prisma.$transaction(async (tx) => {
+    const picks = await tx.orderPick.deleteMany({})
+    const allocations = await tx.orderAllocation.deleteMany({})
+    const productionRuns = await tx.productionRun.deleteMany({})
+    const lots = await tx.inventoryLot.deleteMany({})
+
+    return {
+      picks: picks.count,
+      allocations: allocations.count,
+      productionRuns: productionRuns.count,
+      lots: lots.count,
+    }
+  })
+
   revalidatePath("/dashboard/admin/dev-options")
-  return { success: true, count: count.count }
+  return { success: true, count: result.lots }
 }
 
 /**
  * Clear all orders (and related data)
  */
 export async function clearOrders() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   // Delete in order due to foreign key constraints
   await prisma.orderPick.deleteMany({})
@@ -36,7 +52,7 @@ export async function clearOrders() {
  * Clear all customers
  */
 export async function clearCustomers() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const count = await prisma.customer.deleteMany({})
   
@@ -48,7 +64,7 @@ export async function clearCustomers() {
  * Clear all products
  */
 export async function clearProducts() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const count = await prisma.product.deleteMany({})
   
@@ -60,7 +76,7 @@ export async function clearProducts() {
  * Clear all products and reimport from QBO with proper GTIN generation
  */
 export async function clearAndReimportProducts() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   try {
     // Clear all products
@@ -90,7 +106,7 @@ export async function clearAndReimportProducts() {
  * Clear all vendors
  */
 export async function clearVendors() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const count = await prisma.vendor.deleteMany({})
   
@@ -100,21 +116,82 @@ export async function clearVendors() {
 
 /**
  * Clear all receiving events
+ * Note: Also clears related inventory lots and their dependencies due to foreign key constraints
  */
 export async function clearReceivingEvents() {
-  await requireSrjLabs()
+  await requireAdmin()
 
-  const count = await prisma.receivingEvent.deleteMany({})
-  
-  revalidatePath("/dashboard/admin/dev-options")
-  return { success: true, count: count.count }
+  try {
+    // Delete in order due to foreign key constraints:
+    // 1. Order picks (reference inventory lots with onDelete: Restrict)
+    // 2. Order allocations (reference inventory lots with onDelete: Restrict)
+    // 3. Production runs (reference inventory lots with onDelete: Restrict)
+    // 4. Inventory lots (reference receiving events with onDelete: SetNull, but we delete them anyway)
+    // 5. Receiving events
+    
+    // First, get all lots that have receiving_event_id set
+    const lotsWithEvents = await prisma.inventoryLot.findMany({
+      where: {
+        receiving_event_id: { not: null }
+      },
+      select: { id: true }
+    })
+    const lotIds = lotsWithEvents.map(l => l.id)
+    
+    // Delete dependent records if there are any lots
+    if (lotIds.length > 0) {
+      await prisma.orderPick.deleteMany({
+        where: {
+          inventory_lot_id: { in: lotIds }
+        }
+      })
+      
+      await prisma.orderAllocation.deleteMany({
+        where: {
+          inventory_lot_id: { in: lotIds }
+        }
+      })
+      
+      await prisma.productionRun.deleteMany({
+        where: {
+          OR: [
+            { source_lot_id: { in: lotIds } },
+            { destination_lot_id: { in: lotIds } }
+          ]
+        }
+      })
+    }
+    
+    // Delete inventory lots that reference receiving events
+    const lotsDeleted = await prisma.inventoryLot.deleteMany({
+      where: {
+        receiving_event_id: { not: null }
+      }
+    })
+    
+    // Finally, delete receiving events
+    const count = await prisma.receivingEvent.deleteMany({})
+    
+    revalidatePath("/dashboard/admin/dev-options")
+    return { 
+      success: true, 
+      count: count.count
+    }
+  } catch (error) {
+    console.error("Error clearing receiving events:", error)
+    console.error("Error details:", error instanceof Error ? error.stack : error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to clear receiving events"
+    }
+  }
 }
 
 /**
  * Clear all production runs
  */
 export async function clearProductionRuns() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const count = await prisma.productionRun.deleteMany({})
   
@@ -126,7 +203,7 @@ export async function clearProductionRuns() {
  * Clear all audit logs
  */
 export async function clearAuditLogs() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const count = await prisma.auditLog.deleteMany({})
   
@@ -138,7 +215,7 @@ export async function clearAuditLogs() {
  * Clear all system settings
  */
 export async function clearSystemSettings() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const count = await prisma.systemSetting.deleteMany({})
   
@@ -150,7 +227,7 @@ export async function clearSystemSettings() {
  * Clear all integration settings
  */
 export async function clearIntegrationSettings() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const count = await prisma.integrationSettings.deleteMany({})
   
@@ -163,7 +240,7 @@ export async function clearIntegrationSettings() {
  * WARNING: This is destructive!
  */
 export async function clearAllData() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   // Delete in order due to foreign key constraints
   await prisma.orderPick.deleteMany({})
@@ -186,9 +263,10 @@ export async function clearAllData() {
 
 /**
  * Get database statistics for dev options page
+ * Allows ADMIN and SRJLABS (read-only operation)
  */
 export async function getDevStats() {
-  await requireSrjLabs()
+  await requireAdmin()
 
   const [
     inventoryCount,

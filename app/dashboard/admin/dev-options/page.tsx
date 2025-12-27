@@ -1,17 +1,13 @@
-import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { DevOptionsClient } from "@/components/admin/DevOptionsClient"
 import { getDevStats } from "@/app/actions/dev-options"
+import { requireAdmin } from "@/lib/auth-helpers"
 
 export default async function DevOptionsPage() {
-  const session = await auth()
-
   // Security Check: Only ADMIN and SRJLABS roles can access
-  if (!session?.user) {
-    redirect("/login")
-  }
-
-  if (session.user.role !== "ADMIN" && session.user.role !== "SRJLABS") {
+  try {
+    await requireAdmin()
+  } catch {
     redirect("/dashboard/inventory")
   }
 

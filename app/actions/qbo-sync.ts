@@ -825,7 +825,7 @@ export async function getReceivingEventsForQboSync() {
       where: {
         status: "FINALIZED",
         qbo_id: null,
-      } as any,
+      },
       include: {
         vendor: {
           select: {
@@ -857,7 +857,7 @@ export async function getReceivingEventsForQboSync() {
       where: {
         status: "FINALIZED",
         qbo_id: { not: null },
-      } as any,
+      },
       include: {
         vendor: {
           select: {
@@ -907,7 +907,7 @@ export async function getReceivingEventsForQboSync() {
         received_date: event.received_date,
         finalized_at: event.finalized_at,
         vendor: event.vendor.name,
-        qbo_id: (event as any).qbo_id,
+        qbo_id: event.qbo_id,
         lots_count: event.lots.length,
         status: "SYNCED" as const,
       })),
